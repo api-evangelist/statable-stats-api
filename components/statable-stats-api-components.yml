@@ -1,0 +1,23 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/widgets/overview/ + https://statable.com/llms.txt
+description: Client-side embeddable widget bundles served from statable.com, distinct from the server-side CLI/SDKs.
+families:
+  - family: tracking-script
+    bundles:
+      - {name: s.js,  url_pattern: "https://statable.com/js/{site_id}/s.js", note: "paid plans; ~2 KB brotli; pageviews+engagement+scroll+outbound+downloads"}
+      - {name: "t/{widget}.js", url_pattern: "https://statable.com/js/{hash}/t/{widget}.js", note: "hobby tier; tracker bundled inside the widget"}
+  - family: embeddable-widgets
+    loader: "script tag with data-* attributes"
+    bundles:
+      - {name: luw.js, title: Live Users}
+      - {name: tcw.js, title: Top Countries}
+      - {name: mw.js,  title: Visitor Map (2D)}
+      - {name: gw.js,  title: 3D Globe, note: "data-display-mode=cities replaces the legacy globe"}
+      - {name: gp.js,  title: Legacy globe (frozen), deprecated: true, note: "still served for old embeds; never use for new embeds"}
+  - family: integrations
+    items:
+      - {name: WordPress plugin, url: https://wordpress.org/plugins/statable-analytics, version: 0.34.1}
+      - {name: GTM template, repo: https://github.com/key-arg/statable-tag-template}
+      - {name: n8n community node, package: n8n-nodes-statable, version: 0.1.1}
+browser_global: "window.statable — window.statable.t('event-name', { props }) for custom events"

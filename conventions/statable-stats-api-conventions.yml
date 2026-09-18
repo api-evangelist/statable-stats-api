@@ -1,0 +1,69 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/developers/stats-api/ + openapi/statable-stats-api-openapi.yml
+authentication:
+  style: bearer
+  header: "Authorization: Bearer stbl_<secret>"
+  server_side_only: true
+  cors: none    # /api/v1 sends no CORS headers; a key must never reach browser JS
+  oauth_alternative: OAuth 2.1 fronts the MCP server (scopes read, sites:write)
+idempotency:
+  coverage: partial
+  scope: [createSite]
+  mechanism: "Idempotency-Key request header"
+  conflict: "409 idempotency_conflict when a key is reused with a different body, or its first request is still running"
+  note: >-
+    Only createSite declares an Idempotency-Key parameter in the OpenAPI contract. The
+    idempotency_conflict error is a shared 409 across site/key create responses, but the
+    documented replay-protection header is scoped to createSite, so coverage is partial,
+    not full. Most other writes are naturally idempotent by shape (PUT settings overwrite;
+    create-goal/funnel refuse duplicates with 409 *_exists).
+pagination:
+  style: offset
+  params: [limit, offset]
+  applies_to: "/query breakdown queries (dimension present); misuse on aggregate/time-series -> 400 limit_offset_misuse"
+  note: rolling date-range windows do not paginate (no anchor)
+request_tracing:
+  response_header: X-Request-ID
+  error_body_field: request_id
+  client_supplied: "clients may send their own X-Request-ID; the server records it but always echoes its own"
+  present_on: [success, error, 404]
+versioning:
+  scheme: uri-path
+  current: v1
+  base: https://statable.com/api/v1
+  event_schema_version: "tracking event payload carries v (currently 42); additive minor changes, name/type changes only on major"
+error_envelope:
+  shape: '{ "code": <stable>, "error": <human>, "request_id": <id>, "hint"?: <string>, "docs"?: <uri> }'
+  branch_on: code
+  never_branch_on: error   # human-readable, may be reworded
+  content_type: application/json   # NOT application/problem+json
+rate_limit_signaling:
+  headers: [X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After]
+  reset_semantics: seconds-from-now (not epoch)
+  ref: rate-limits/statable-stats-api-rate-limits.yml
+reversibility:
+  grade: documented
+  na: false
+  note: >-
+    No cancel/undo/refund/restore concept exists in this analytics API. Configuration writes
+    are overwrite-reversible (re-PUT the prior value), which is documented but has no window.
+    Destructive operations are permanent with NO restore endpoint or window.
+  surfaces:
+    - operations: [setTrackingSettings, setHostnameSettings, setBlockedIPs, setCountrySettings, setPublicDashboard]
+      reversal: re-set-prior-value
+      window: none
+      grade: documented
+      note: a settings PUT is its own inverse if the prior value is known
+    - operations: [deleteSite, deleteGoal, deleteFunnel, revokeApiKey]
+      reversal: none
+      irreversible: true
+      note: "permanent; docs state deletes cannot be undone and 'no endpoint edits or deletes collected events'"
+    - operations: [rotateApiKey]
+      reversal: none
+      note: old token stops working immediately when the new one appears; not reversible
+cross_links:
+  errors: errors/statable-stats-api-problem-types.yml
+  lifecycle: lifecycle/statable-stats-api-lifecycle.yml
+  authentication: authentication/statable-stats-api-authentication.yml
+  rate_limits: rate-limits/statable-stats-api-rate-limits.yml

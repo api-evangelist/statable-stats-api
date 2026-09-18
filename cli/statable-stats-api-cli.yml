@@ -1,0 +1,27 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/cli/
+binary: statable
+description: One static binary over the Stats API — every endpoint, read and write, from a terminal/script/CI.
+install:
+  - {method: homebrew, command: "brew install key-arg/tap/statable"}
+  - {method: go,       command: "go install github.com/key-arg/statable-cli/cmd/statable@latest"}
+  - {method: mise,     command: "mise use -g statable"}
+  - {method: scoop,    command: "scoop install statable", note: "key-arg/scoop-bucket"}
+  - {method: winget,   note: "published to winget-pkgs"}
+repo: https://github.com/key-arg/statable-cli
+latest_version: v0.4.4
+latest_released: '2026-09-16'
+auth:
+  - "statable auth login"
+  - "statable auth register  # opens an account without a browser"
+  - "STATABLE_API_KEY env var (CI)"
+commands:
+  - {group: stats,   examples: ["statable stats", "statable top pages", "statable query"]}
+  - {group: sites,   description: create/configure sites, goals, funnels, tracking settings}
+  - {group: keys,    description: manage API keys}
+  - {group: check,   description: "assert a metric is within bounds (exit 3 when out of bounds)"}
+output:
+  json: "--json for machine output; CSV also supported"
+  exit_codes: {0: success, 1: action required, 2: failed, 3: statable check out of bounds, 64: malformed command line}
+config: "environment variables, .statable.yml, endpoint override escape hatch"

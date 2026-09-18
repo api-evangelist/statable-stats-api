@@ -1,0 +1,39 @@
+generated: '2026-09-18'
+method: probed
+source: live probes of every host in apis.yml + OpenAPI servers[]
+# Path list probed by name on each host (closed list, not a glob). Negative-control
+# path (/.well-known/statable-negcontrol-7f3ab91c.json) returned 404 on every host,
+# so no path-echo false positives. RFC 8414 (oauth-authorization-server) and RFC 9728
+# (oauth-protected-resource) discovery docs are served for the OAuth 2.1 MCP surface.
+path_echo_control: passed
+hosts:
+  - host: https://statable.com
+    documents:
+      - {path: /.well-known/oauth-authorization-server, status: 200, file: statable-stats-api-oauth-authorization-server.json}
+      - {path: /.well-known/oauth-protected-resource, status: 200, file: statable-stats-api-oauth-protected-resource.json}
+      - {path: /.well-known/security.txt, status: 404}
+      - {path: /.well-known/openid-configuration, status: 404}
+      - {path: /.well-known/api-catalog, status: 404}
+      - {path: /.well-known/ai-plugin.json, status: 404}
+      - {path: /.well-known/apis.json, status: 404}
+      - {path: /apis.json, status: 404}
+      - {path: /apis.yml, status: 404}
+      - {path: /.well-known/agent-card.json, status: 404}
+      - {path: /.well-known/agent.json, status: 404}
+      - {path: /.well-known/statable-negcontrol-7f3ab91c.json, status: 404}
+  - host: https://mcp.statable.com
+    documents:
+      - {path: /.well-known/oauth-protected-resource, status: 200, file: statable-stats-api-mcp-oauth-protected-resource.json}
+      - {path: /.well-known/oauth-authorization-server, status: 302, note: "redirects to https://statable.com/.well-known/oauth-authorization-server (saved under that host)"}
+      - {path: /.well-known/security.txt, status: 404}
+      - {path: /.well-known/agent-card.json, status: 404}
+      - {path: /.well-known/agent.json, status: 404}
+      - {path: /.well-known/statable-negcontrol-7f3ab91c.json, status: 404}
+  - host: https://dev.statable.com
+    documents:
+      - {path: /.well-known/oauth-authorization-server, status: 200, file: statable-stats-api-dev-oauth-authorization-server.json}
+      - {path: /.well-known/oauth-protected-resource, status: 200, file: statable-stats-api-dev-oauth-protected-resource.json}
+      - {path: /.well-known/security.txt, status: 404}
+      - {path: /.well-known/agent-card.json, status: 404}
+      - {path: /.well-known/agent.json, status: 404}
+      - {path: /.well-known/statable-negcontrol-7f3ab91c.json, status: 404}

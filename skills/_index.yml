@@ -1,0 +1,20 @@
+generated: '2026-09-18'
+method: generated
+source: openapi/statable-stats-api-openapi.yml + conventions/ + errors/
+skills:
+  - file: statable-stats-api-register-and-provision.md
+    name: Register and provision a site without a browser
+    api: openapi/statable-stats-api-openapi.yml
+    operations: [bootstrapSendOTP, bootstrapVerifyOTP, createSite, getSiteSnippet]
+  - file: statable-stats-api-query-analytics.md
+    name: Query a site's analytics
+    api: openapi/statable-stats-api-openapi.yml
+    operations: [listSites, query, currentVisitors, listPropKeys]
+  - file: statable-stats-api-goals-and-funnels.md
+    name: Create goals and funnels and run a funnel report
+    api: openapi/statable-stats-api-openapi.yml
+    operations: [createGoal, listSiteGoals, createFunnel, listFunnels, runFunnelReport]
+  - file: statable-stats-api-manage-keys.md
+    name: Manage API keys over HTTP
+    api: openapi/statable-stats-api-openapi.yml
+    operations: [listApiKeys, createApiKey, rotateApiKey, revokeApiKey, listApiKeyEvents]

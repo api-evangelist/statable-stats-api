@@ -1,0 +1,23 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/developers/stats-api/ + https://status.statable.com
+versioning:
+  scheme: uri-path
+  current: v1
+  base: https://statable.com/api/v1
+  event_schema: "tracking payload version v=42; additive minor, name/type changes only on major"
+  docs: https://statable.com/docs/developers/stats-api/overview/
+deprecation:
+  policy_url: null
+  sunset_header: false
+  note: No formal REST deprecation policy or RFC 8594 Sunset/Deprecation header support was found. No operations are marked deprecated in the OpenAPI.
+sla:
+  url: null
+  uptime_target: null
+  note: No published numeric SLA/uptime target; a public status page exists.
+status_page: https://status.statable.com
+support:
+  email: support@statable.com
+  typical_response: a few minutes
+  incident_channels: [email, Slack, RSS, "X @StatableCom"]
+deprecated_operations: []

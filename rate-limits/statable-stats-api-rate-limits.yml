@@ -1,0 +1,31 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/developers/stats-api/rate-limits/
+limit_count: 3
+windows:
+  - scope: account
+    keyed_on: account owner
+    window: 1h rolling
+    limit: plan-dependent (not published; read from headers)
+    note: checked first; issuing more keys does not raise it
+  - scope: per-key
+    keyed_on: api key
+    window: 1h rolling
+    limit: plan-dependent (not published; read from headers)
+    note: sits under the account window; contains a runaway or leaked key
+  - scope: writes
+    keyed_on: account owner
+    window: 1h rolling
+    limit: plan-dependent (not published)
+    note: separate budget on top of the other two; a mutating call is counted twice
+response_headers:
+  - X-RateLimit-Limit        # hourly ceiling for the reported window
+  - X-RateLimit-Remaining    # requests left
+  - X-RateLimit-Reset        # SECONDS until the window frees (not an epoch timestamp)
+  - Retry-After              # on 429, seconds to wait
+exhaustion:
+  status: 429
+  code: rate_limited
+  body_error_names_budget: ['write', 'account', 'api key']
+  retry: honor Retry-After (seconds)
+mcp_note: The MCP server authenticates the same way and draws on the same budgets; a tool call and a curl cost the same.

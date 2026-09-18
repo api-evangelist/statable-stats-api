@@ -1,0 +1,31 @@
+generated: '2026-09-18'
+method: derived
+source: openapi/statable-stats-api-openapi.yml
+entities:
+  - {name: Account, id_field: owner, note: billing + rate-limit boundary; owns sites and keys}
+  - {name: Site, id_field: site_id, prefix: numeric, note: has hash, timezone, stats_start_date}
+  - {name: Goal, id_field: goalId}
+  - {name: Funnel, id_field: id, note: 2-8 FunnelStep}
+  - {name: FunnelStep}
+  - {name: APIKey, id_field: id, prefix: "stbl_"}
+  - {name: APIKeyEvent}
+  - {name: Subscription, note: plan state of the key owner}
+  - {name: TrackingSettings}
+  - {name: HostnameList}
+  - {name: CountryList}
+  - {name: PublicDashboard}
+relationships:
+  - {from: Account, to: Site,      kind: has_many, via: owner}
+  - {from: Account, to: APIKey,    kind: has_many, via: owner}
+  - {from: Account, to: Subscription, kind: has_one}
+  - {from: Site,    to: Goal,      kind: has_many, via: site_id}
+  - {from: Site,    to: Funnel,    kind: has_many, via: site_id}
+  - {from: Site,    to: TrackingSettings, kind: has_one, via: site_id}
+  - {from: Site,    to: HostnameList,     kind: has_one, via: site_id}
+  - {from: Site,    to: CountryList,      kind: has_one, via: site_id}
+  - {from: Site,    to: PublicDashboard,  kind: has_one, via: site_id}
+  - {from: Goal,    to: Site,      kind: belongs_to, via: site_id}
+  - {from: Funnel,  to: Site,      kind: belongs_to, via: site_id}
+  - {from: Funnel,  to: FunnelStep, kind: has_many}
+  - {from: APIKey,  to: Account,   kind: belongs_to, via: owner}
+  - {from: APIKey,  to: APIKeyEvent, kind: has_many, via: id}

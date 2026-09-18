@@ -1,0 +1,34 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/.well-known/oauth-authorization-server
+docs: https://statable.com/docs/integrations/mcp/
+# The REST API authenticates with an stbl_ bearer key whose PERMISSIONS (Read analytics,
+# Manage sites, Manage API keys) are fixed at creation. The OAuth 2.1 surface that fronts the
+# MCP server uses SCOPES, advertised in RFC 8414 metadata. Both are recorded here.
+oauth:
+  authorization_server: https://statable.com
+  issuer: https://statable.com
+  authorization_endpoint: https://statable.com/api/oauth/authorize
+  token_endpoint: https://statable.com/api/oauth/token
+  registration_endpoint: https://statable.com/api/oauth/register   # RFC 7591 Dynamic Client Registration
+  revocation_endpoint: https://statable.com/api/oauth/revoke
+  grant_types: [authorization_code, refresh_token]
+  code_challenge_methods: [S256]                                    # PKCE required
+  token_endpoint_auth_methods: [none]                               # public clients
+scopes:
+  - scope: read
+    description: Read analytics — visitors, pageviews, sources, goals, funnels, live visitors. Always granted.
+    flows: [authorizationCode]
+  - scope: sites:write
+    description: Create and configure sites, goals, funnels, tracking settings and filters. Granted on the OAuth consent screen.
+    flows: [authorizationCode]
+key_permissions:
+  # stbl_ API-key permissions (fixed at key creation; not OAuth scopes)
+  - name: Read analytics
+    always_on: true
+  - name: Manage sites
+    description: create/update sites, goals, funnels, tracking settings; can delete site data and make analytics public
+  - name: Manage API keys
+    description: create, rotate and revoke other keys
+notes:
+  - "billing:write is referenced in docs as a scope that CANNOT be obtained via the HTTP bootstrap (400 invalid_scope); it is not advertised in the MCP OAuth scopes_supported."

@@ -1,0 +1,21 @@
+generated: '2026-09-18'
+method: probed
+source: https://statable.com/pricing.json
+docs: https://statable.com/pricing
+plan_count: 10
+currency: USD
+billing_periods: [monthly, yearly]
+pricing_model: monthly pageviews across all sites in the account
+trial_days: 30
+included_features: [Unlimited websites, Import from Google Analytics, Forever data retention, No cookies/no banners, GDPR-compliant by default, Real-time insights, Priority support]
+plans:
+  - {name: 10K,  quota_pageviews_month: 10000,    price_monthly_usd: 9,   price_yearly_usd_per_month: 7}
+  - {name: 100K, quota_pageviews_month: 100000,   price_monthly_usd: 19,  price_yearly_usd_per_month: 15}
+  - {name: 200K, quota_pageviews_month: 200000,   price_monthly_usd: 29,  price_yearly_usd_per_month: 23}
+  - {name: 500K, quota_pageviews_month: 500000,   price_monthly_usd: 49,  price_yearly_usd_per_month: 39}
+  - {name: 1M,   quota_pageviews_month: 1000000,  price_monthly_usd: 69,  price_yearly_usd_per_month: 55}
+  - {name: 2M,   quota_pageviews_month: 2000000,  price_monthly_usd: 89,  price_yearly_usd_per_month: 71}
+  - {name: 5M,   quota_pageviews_month: 5000000,  price_monthly_usd: 129, price_yearly_usd_per_month: 103}
+  - {name: 10M,  quota_pageviews_month: 10000000, price_monthly_usd: 169, price_yearly_usd_per_month: 135}
+  - {name: 10M+, quota_pageviews_month: null,     price: contact sales, note: custom pricing}
+  - {name: Free Access, price_monthly_usd: 0, note: "permanent free for sites on .edu / .github.io / .gitlab.io (per site, widget required)"}

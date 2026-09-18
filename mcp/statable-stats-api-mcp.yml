@@ -1,0 +1,40 @@
+generated: '2026-09-18'
+method: searched
+status: published
+source: https://statable.com/docs/integrations/mcp/
+server:
+  name: statable
+  transport: http                       # Streamable HTTP
+  url: https://mcp.statable.com/mcp
+deployment:
+  mode: both                            # hosted remote endpoint AND a local stdio bridge
+  endpoint: https://mcp.statable.com/mcp
+  install: "npx -y @statable/mcp"       # local stdio bridge, forwards to the same remote with an API key
+  package: https://www.npmjs.com/package/@statable/mcp
+  auth: oauth                           # OAuth 2.1 (PKCE S256, DCR) on the remote; the stdio bridge uses an stbl_ API key
+  verified: probed                      # POST tools/list -> 401 OAuth challenge (auth-gated); OAuth metadata fetched
+auth:
+  type: oauth2.1
+  scopes: [read, sites:write]
+  authorization_server: https://statable.com
+  protected_resource: https://mcp.statable.com/mcp
+  well_known:
+    oauth_authorization_server: well-known/statable-stats-api-oauth-authorization-server.json
+    oauth_protected_resource: well-known/statable-stats-api-mcp-oauth-protected-resource.json
+  api_key_alternative: "Authorization: Bearer stbl_<secret> (suits scripts/servers that cannot open a browser)"
+tools_summary:
+  total: 25
+  read: 16
+  write: 9
+  delete: 0
+  note: >-
+    tools/list is OAuth-gated (401 with WWW-Authenticate bearer challenge), so the live tool
+    inputSchemas require authenticated introspection. Counts and read/write split are from the
+    provider's published llms.txt and MCP docs; the backing REST operations are enumerated in
+    the tool crosswalk. None of the 25 tools delete a site/goal/funnel or touch collected analytics.
+x-evidence:
+  tools_list_probe:
+    url: https://mcp.statable.com/mcp
+    method: POST
+    http_status: 401
+    challenge: 'WWW-Authenticate: Bearer resource_metadata="https://mcp.statable.com/.well-known/oauth-protected-resource"'

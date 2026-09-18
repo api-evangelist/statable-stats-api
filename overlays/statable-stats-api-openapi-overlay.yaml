@@ -1,0 +1,16 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements for Statable Stats API
+  version: 1.0.0
+extends: openapi/statable-stats-api-openapi.yml
+actions:
+  - target: $.info
+    update:
+      x-apievangelist-enriched: '2026-09-18'
+      x-agent-native: true
+      x-mcp-server: https://mcp.statable.com/mcp
+      x-idempotency-coverage: partial
+      x-error-format: custom-json
+  - target: $.info
+    update:
+      x-apievangelist-tags: [analytics, web-analytics, cookieless, privacy, GDPR, EU-hosted]

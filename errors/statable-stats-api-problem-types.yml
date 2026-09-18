@@ -1,0 +1,60 @@
+generated: '2026-09-18'
+method: searched
+source: https://statable.com/docs/developers/stats-api/errors/ + openapi/statable-stats-api-openapi.yml
+format: custom-json           # NOT rfc9457; envelope { code, error, request_id, hint?, docs? }
+envelope:
+  required: [code, error, request_id]
+  optional: [hint, docs]      # only on not_found and method_not_allowed
+  branch_on: code
+  request_id_header: X-Request-ID
+status_codes_in_spec: [200, 204, 400, 401, 403, 404, 405, 409, 429, 500]
+problems:
+  # 400 Bad request
+  - {status: 400, code: invalid_request,        title: Malformed JSON body}
+  - {status: 400, code: metrics_required,        title: metrics empty or missing}
+  - {status: 400, code: unknown_metric,          title: No such metric}
+  - {status: 400, code: metric_not_available,    title: Real metric but this dimension does not compute it}
+  - {status: 400, code: too_many_dimensions,     title: More than one dimension}
+  - {status: 400, code: unknown_dimension,       title: No such dimension}
+  - {status: 400, code: invalid_date_range,      title: Missing/malformed/out-of-span date range}
+  - {status: 400, code: invalid_interval,        title: Time bucket does not suit the range}
+  - {status: 400, code: invalid_filter,          title: Bad filter field/operator/value}
+  - {status: 400, code: event_filter_required,   title: event:props:<key> without an event filter}
+  - {status: 400, code: invalid_compare,         title: compare is neither previous_period nor a valid pair}
+  - {status: 400, code: compare_length_mismatch, title: compare range differs in length from date_range}
+  - {status: 400, code: site_id_required,        title: all-sites key omitted site_id}
+  - {status: 400, code: limit_offset_misuse,     title: limit/offset sent on an aggregate or time series}
+  - {status: 400, code: invalid_scope,           title: requested key permission is not one Statable has}
+  - {status: 400, code: invalid_expiry,          title: expires_in_days outside 1..365}
+  - {status: 400, code: key_limit_reached,       title: account at its active-key cap (default 10)}
+  - {status: 400, code: terms_not_accepted,      title: registration without accept_terms true; no account created}
+  - {status: 400, code: domain_not_allowed,      title: "site URL or email in a blocked zone (.ru .su .by .рф .бел)"}
+  - {status: 400, code: email_undeliverable,     title: "reserved/special-use domain or non-ASCII mailbox"}
+  # 401 Authentication
+  - {status: 401, code: unauthorized, title: token missing/malformed/invalid/expired/revoked}
+  - {status: 401, code: otp_invalid,  title: emailed code wrong/expired/already used}
+  # 403 Refused
+  - {status: 403, code: insufficient_scope, title: key lacks the permission the endpoint needs}
+  - {status: 403, code: key_not_scoped,     title: single-site key asked for a different site}
+  - {status: 403, code: tracking_inactive,  title: site is no longer collecting data}
+  - {status: 403, code: not_site_owner,     title: role does not allow it (member cannot write; only owner deletes)}
+  - {status: 403, code: scope_escalation,   title: new key asked for permissions the acting key lacks}
+  # 404 Not found
+  - {status: 404, code: unknown_site,      title: site_id does not exist or no access (deliberately indistinguishable)}
+  - {status: 404, code: unknown_funnel,    title: no such funnel on the resolved site}
+  - {status: 404, code: goal_not_found,    title: no such goal on the resolved site}
+  - {status: 404, code: api_key_not_found, title: unknown/revoked/other-account key}
+  - {status: 404, code: write_disabled,    title: write surface switched off on this deployment}
+  - {status: 404, code: not_found,         title: no /api/v1 route matches (carries hint + docs)}
+  # 405 Wrong method
+  - {status: 405, code: method_not_allowed, title: path exists, method does not (Allow header + hint + docs)}
+  # 409 Conflict
+  - {status: 409, code: site_exists,          title: account already has a site with that URL}
+  - {status: 409, code: goal_exists,          title: site already has a goal with that name}
+  - {status: 409, code: funnel_exists,        title: site already has a funnel with that name}
+  - {status: 409, code: idempotency_conflict, title: Idempotency-Key reused with a different body, or first request still running}
+  - {status: 409, code: self_modification,    title: a key tried to rotate or revoke itself}
+  - {status: 409, code: hobby_always_public,  title: public-dashboard false on a hobby site with no paid subscription}
+  # 429 / 500
+  - {status: 429, code: rate_limited, title: an hourly budget ran out (error names write/account/api key); Retry-After set}
+  - {status: 500, code: internal,     title: server error; use request_id to find the log line}

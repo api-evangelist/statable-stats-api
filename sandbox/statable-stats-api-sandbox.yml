@@ -1,0 +1,14 @@
+generated: '2026-09-18'
+method: searched
+source: openapi/statable-stats-api-openapi.yml (servers[]) + https://statable.com/docs/
+# Statable has no payments-style test/live key separation. What exists:
+environments:
+  - {name: Production, base: https://statable.com/api/v1}
+  - {name: Development, base: https://dev.statable.com/api/v1, note: "published as a second OpenAPI server; own OAuth issuer dev.statable.com"}
+public_demo:
+  url: https://statable.com/share/03D3Cfb9eA
+  note: live public demo dashboard (site hash 03D3Cfb9eA)
+registration_without_browser: "POST /auth/send-otp then POST /auth/verify-otp returns the first stbl_ key; free 30-day trial, no card"
+reserved_test_values:
+  note: "example.com and special-use zones (.test .invalid .example .localhost, non-ASCII mailboxes) are REJECTED at registration (400 email_undeliverable); use a real inbox. There are no magic test identifiers."
+no_test_mode: true

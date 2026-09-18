@@ -1,0 +1,56 @@
+generated: '2026-09-18'
+method: derived
+source: openapi/statable-stats-api-openapi.yml + https://statable.com/llms.txt
+# The MCP server exposes 25 tools (16 read, 9 write, 0 delete). tools/list is OAuth-gated,
+# so exact tool names + inputSchemas need authenticated introspection. Rows below bind the
+# MCP surface to VERIFIED OpenAPI operationIds by semantics; each tool inherits its backing
+# operation's parameters + requestBody as its real inputSchema. Confidence is medium because
+# the live tool manifest could not be read anonymously. rest_only[] captures the operations
+# the provider states the MCP deliberately does NOT expose (deletes, key management, bootstrap).
+surfaces:
+  openapi: openapi/statable-stats-api-openapi.yml
+  mcp:
+    url: https://mcp.statable.com/mcp
+    gated: true
+    note: tools/list returns 401 OAuth challenge; schemas require authenticated introspection
+  graphql: null
+crosswalk:
+  # --- read (16) ---
+  - {tool: list_sites,             category: sites,    rest: [listSites],           binding: rest, confidence: high}
+  - {tool: query,                  category: stats,    rest: [query],               binding: rest, confidence: high}
+  - {tool: current_visitors,       category: stats,    rest: [currentVisitors],     binding: rest, confidence: high}
+  - {tool: list_prop_keys,         category: stats,    rest: [listPropKeys],        binding: rest, confidence: medium}
+  - {tool: list_funnels,           category: funnels,  rest: [listFunnels],         binding: rest, confidence: medium}
+  - {tool: run_funnel_report,      category: funnels,  rest: [runFunnelReport],     binding: rest, confidence: medium}
+  - {tool: get_subscription,       category: account,  rest: [getSubscription],     binding: rest, confidence: medium}
+  - {tool: get_site_snippet,       category: sites,    rest: [getSiteSnippet],      binding: rest, confidence: medium}
+  - {tool: list_site_goals,        category: goals,    rest: [listSiteGoals],       binding: rest, confidence: medium}
+  - {tool: get_tracking_settings,  category: settings, rest: [getTrackingSettings], binding: rest, confidence: medium}
+  - {tool: get_hostname_settings,  category: settings, rest: [getHostnameSettings], binding: rest, confidence: medium}
+  - {tool: get_blocked_ips,        category: settings, rest: [getBlockedIPs],       binding: rest, confidence: medium}
+  - {tool: get_country_settings,   category: settings, rest: [getCountrySettings],  binding: rest, confidence: medium}
+  - {tool: get_public_dashboard,   category: settings, rest: [getPublicDashboard],  binding: rest, confidence: medium}
+  - {tool: list_api_keys,          category: keys,     rest: [listApiKeys],         binding: rest, confidence: low, note: "may be excluded; key mgmt is sensitive"}
+  - {tool: list_api_key_events,    category: keys,     rest: [listApiKeyEvents],    binding: rest, confidence: low, note: "may be excluded; key mgmt is sensitive"}
+  # --- write (9: create/configure sites, goals, funnels, tracking settings, filters; no delete) ---
+  - {tool: create_site,            category: sites,    rest: [createSite],          binding: rest, confidence: high}
+  - {tool: update_site,            category: sites,    rest: [updateSite],          binding: rest, confidence: medium}
+  - {tool: create_goal,            category: goals,    rest: [createGoal],          binding: rest, confidence: medium}
+  - {tool: update_goal,            category: goals,    rest: [updateGoal],          binding: rest, confidence: medium}
+  - {tool: create_funnel,          category: funnels,  rest: [createFunnel],        binding: rest, confidence: medium}
+  - {tool: update_funnel,          category: funnels,  rest: [updateFunnel],        binding: rest, confidence: medium}
+  - {tool: set_tracking_settings,  category: settings, rest: [setTrackingSettings], binding: rest, confidence: medium}
+  - {tool: set_blocked_ips,        category: filters,  rest: [setBlockedIPs],       binding: rest, confidence: medium}
+  - {tool: set_hostname_settings,  category: filters,  rest: [setHostnameSettings, setCountrySettings, setPublicDashboard], binding: rest, confidence: low, note: "the 9th write tool covers one/more of the remaining filter/settings PUTs; exact split needs authenticated tools/list"}
+mcp_only: []
+rest_only:
+  - {operations: [deleteSite, deleteGoal, deleteFunnel], reason: "MCP exposes no delete tools (llms.txt: 'none delete')"}
+  - {operations: [createApiKey, revokeApiKey, rotateApiKey], reason: "API key management not surfaced as MCP tools (dashboard/HTTP only)"}
+  - {operations: [bootstrapSendOTP, bootstrapVerifyOTP], reason: "account bootstrap/registration is the pre-credential HTTP surface, not an MCP tool"}
+coverage:
+  rest_ops_total: 35
+  tools_named: 25
+  tools_bound_to_rest: 25
+  mcp_only: 0
+  rest_only_ops: 8
+  note: read/write split (16/9) and delete-exclusion are provider-stated; per-tool bindings inferred by semantics (gated tools/list)

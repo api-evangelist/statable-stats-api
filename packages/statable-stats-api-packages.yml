@@ -1,0 +1,47 @@
+generated: '2026-09-18'
+method: searched
+source: npm, pkg.go.dev/proxy.golang.org, WordPress.org, github.com/key-arg
+packages:
+  - language: javascript
+    registry: npm
+    name: "@statable/mcp"
+    url: https://www.npmjs.com/package/@statable/mcp
+    install: npx -y @statable/mcp
+    official: true
+    version: 0.1.0
+    published: '2026-09-04'
+    note: local stdio MCP bridge; forwards to mcp.statable.com/mcp with an stbl_ key
+  - language: go
+    registry: go
+    name: github.com/key-arg/statable-cli
+    url: https://pkg.go.dev/github.com/key-arg/statable-cli
+    install: go install github.com/key-arg/statable-cli/cmd/statable@latest
+    official: true
+    version: v0.4.4
+    published: '2026-09-16'
+    note: the `statable` CLI (see cli/); also via Homebrew/Scoop/winget/mise
+  - language: javascript
+    registry: npm
+    name: n8n-nodes-statable
+    url: https://www.npmjs.com/package/n8n-nodes-statable
+    install: n8n community node install
+    official: true
+    version: 0.1.1
+    published: '2026-09-15'
+    note: n8n community node
+  - language: php
+    registry: wordpress
+    name: statable-analytics
+    url: https://wordpress.org/plugins/statable-analytics
+    official: true
+    version: 0.34.1
+    published: '2026-09-11'
+    note: official WordPress plugin (tracker install, not a REST client library)
+  - language: shell
+    registry: homebrew
+    name: key-arg/tap/statable
+    url: https://github.com/key-arg/homebrew-tap
+    install: brew install key-arg/tap/statable
+    official: true
+    version: null
+    note: Homebrew tap distributing the CLI binary; version tracks the statable-cli release (v0.4.4)

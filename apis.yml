@@ -1,14 +1,30 @@
 name: Statable Stats API
-description: >-
-  Privacy-first, cookieless web analytics from Statable (Key Arg B.V.), EU-hosted in the Netherlands with GDPR
-  compliance and a ~2 KB tracking script. Exposes a server-side REST HTTP API with a public OpenAPI 3.1 contract, a
-  hosted MCP server, an llms.txt, and a CLI for querying visitors, pages, sources, goals, funnels, custom events and
-  live visitors.
+description: Privacy-first, cookieless web analytics from Statable (Key Arg B.V.), EU-hosted in the Netherlands with GDPR
+  compliance and a ~2 KB tracking script. Exposes a server-side REST HTTP API with a public OpenAPI 3.1 contract, a hosted
+  MCP server, an llms.txt, and a CLI for querying visitors, pages, sources, goals, funnels, custom events and live visitors.
 url: https://raw.githubusercontent.com/api-evangelist/statable-stats-api/refs/heads/main/apis.yml
 created: '2026-09-18'
 modified: '2026-09-18'
 specificationVersion: '0.21'
 tags:
+- analytics
+- web-analytics
+- cookieless
+- privacy
+- GDPR
+- openapi
+- mcp
+- llms-txt
+- EU-hosted
+apis:
+- name: Statable Stats API
+  description: Read-focused REST HTTP API for privacy-first web analytics. Bearer (stbl_) auth, server-side only (no CORS).
+    Endpoints include GET /sites, POST /query, GET /current-visitors, GET /props, GET /funnels, POST /funnels/{id}/report,
+    GET /subscription, plus a flagged key-management write surface. Includes a public OpenAPI 3.1 contract, a hosted MCP server,
+    and an llms.txt.
+  humanURL: https://statable.com/docs/developers/stats-api/overview/
+  baseURL: https://statable.com/api/v1
+  tags:
   - analytics
   - web-analytics
   - cookieless
@@ -18,40 +34,106 @@ tags:
   - mcp
   - llms-txt
   - EU-hosted
-apis:
-  - name: Statable Stats API
-    description: >-
-      Read-focused REST HTTP API for privacy-first web analytics. Bearer (stbl_) auth, server-side only (no CORS).
-      Endpoints include GET /sites, POST /query, GET /current-visitors, GET /props, GET /funnels, POST
-      /funnels/{id}/report, GET /subscription, plus a flagged key-management write surface. Includes a public OpenAPI
-      3.1 contract, a hosted MCP server, and an llms.txt.
-    humanURL: https://statable.com/docs/developers/stats-api/overview/
-    baseURL: https://statable.com/api/v1
-    tags:
-      - analytics
-      - web-analytics
-      - cookieless
-      - privacy
-      - GDPR
-      - openapi
-      - mcp
-      - llms-txt
-      - EU-hosted
-    properties:
-      - type: OpenAPI
-        url: https://statable.com/api/v1/openapi.yaml
-      - type: MCPServer
-        url: https://mcp.statable.com/mcp
-      - type: LLMsTxt
-        url: https://statable.com/llms.txt
-      - type: LLMsTxt
-        url: https://statable.com/docs/llms-full.txt
-      - type: Documentation
-        url: https://statable.com/docs/developers/
+  properties:
+  - type: OpenAPI
+    url: openapi/statable-stats-api-openapi.yml
+  - type: OpenAPI
+    name: OpenAPI (provider-hosted)
+    url: https://statable.com/api/v1/openapi.yaml
+  - type: MCPServer
+    url: https://mcp.statable.com/mcp
+  - type: ToolCrosswalk
+    url: mcp/statable-stats-api-tool-crosswalk.yml
+  - type: LLMsTxt
+    url: https://statable.com/llms.txt
+  - type: LLMsTxt
+    name: LLMsTxt (local)
+    url: llms/statable-stats-api-llms.txt
+  - type: Documentation
+    url: https://statable.com/docs/developers/
+  - type: APIReference
+    url: https://statable.com/docs/developers/stats-api/endpoints/
+  image: https://statable.com/thumbnail.png
 maintainers:
-  - FN: Key Arg B.V.
-    url: https://statable.com
-generated:
+- FN: Key Arg B.V.
+  url: https://statable.com
+  email: support@statable.com
+common:
+- type: Website
+  url: https://statable.com
+- type: DeveloperPortal
+  url: https://statable.com/docs/developers/
+- type: Documentation
+  url: https://statable.com/docs/
+- type: GettingStarted
+  url: https://statable.com/docs/getting-started/quick-start/
+- type: Support
+  url: https://statable.com/docs/help/service-status/
+- type: GitHubOrganization
+  url: https://github.com/key-arg
+- type: Pricing
+  url: https://statable.com/pricing
+- type: SignUp
+  url: https://statable.com/auth/signup
+- type: TermsOfService
+  url: https://statable.com/terms
+- type: PrivacyPolicy
+  url: https://statable.com/privacy
+- type: Security
+  url: https://statable.com/security
+- type: Compliance
+  url: https://statable.com/gdpr
+- type: StatusPage
+  url: https://status.statable.com
+- type: AgenticAccess
+  url: agentic-access/statable-stats-api-agentic-access.yml
+- type: Authentication
+  url: authentication/statable-stats-api-authentication.yml
+- type: OAuthScopes
+  url: scopes/statable-stats-api-scopes.yml
+- type: DomainSecurity
+  url: security/statable-stats-api-domain-security.yml
+- type: VulnerabilityDisclosure
+  url: security/statable-stats-api-vulnerability-disclosure.yml
+- type: TrustCenter
+  url: security/statable-stats-api-trust-center.yml
+- type: Conformance
+  url: conformance/statable-stats-api-conformance.yml
+- type: WellKnown
+  url: well-known/statable-stats-api-well-known.yml
+- type: ErrorCatalog
+  url: errors/statable-stats-api-problem-types.yml
+- type: Lifecycle
+  url: lifecycle/statable-stats-api-lifecycle.yml
+- type: RateLimits
+  url: rate-limits/statable-stats-api-rate-limits.yml
+- type: Conventions
+  url: conventions/statable-stats-api-conventions.yml
+- type: Idempotency
+  url: conventions/statable-stats-api-conventions.yml
+- type: Packages
+  url: packages/statable-stats-api-packages.yml
+- type: SDKs
+  url: packages/statable-stats-api-packages.yml
+- type: CLI
+  url: cli/statable-stats-api-cli.yml
+- type: Components
+  url: components/statable-stats-api-components.yml
+- type: DataModel
+  url: data-model/statable-stats-api-data-model.yml
+- type: Plans
+  url: plans/statable-stats-api-plans-pricing.yml
+- type: AgentSkill
+  url: skills/_index.yml
+- type: Overlay
+  url: overlays/statable-stats-api-openapi-overlay.yaml
+x-enrichment:
+  date: '2026-09-18'
+  status: enriched
+  artifacts_added: 24
+  pass: local-v3
+image: https://statable.com/thumbnail.png
+x-generated:
   by: apis.io/add
   model: claude-opus-4-8
   confidence: 97

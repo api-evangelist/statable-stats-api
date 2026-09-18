@@ -1,0 +1,16 @@
+generated: '2026-09-18'
+method: derived
+source: openapi/statable-stats-api-openapi.yml
+summary:
+  types:
+  - http
+schemes:
+- name: bearerAuth
+  type: http
+  scheme: bearer
+  bearerFormat: stbl_<secret>
+  description: A key minted in Settings → API. All tokens start with `stbl_`. Missing, malformed,
+    invalid, expired, or revoked → 401. Every operation in this spec requires the key's `read`
+    scope; without it → 403 `insufficient_scope`.
+  sources:
+  - openapi/statable-stats-api-openapi.yml
