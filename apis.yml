@@ -1,0 +1,58 @@
+name: Statable Stats API
+description: >-
+  Privacy-first, cookieless web analytics from Statable (Key Arg B.V.), EU-hosted in the Netherlands with GDPR
+  compliance and a ~2 KB tracking script. Exposes a server-side REST HTTP API with a public OpenAPI 3.1 contract, a
+  hosted MCP server, an llms.txt, and a CLI for querying visitors, pages, sources, goals, funnels, custom events and
+  live visitors.
+url: https://raw.githubusercontent.com/api-evangelist/statable-stats-api/refs/heads/main/apis.yml
+created: '2026-09-18'
+modified: '2026-09-18'
+specificationVersion: '0.21'
+tags:
+  - analytics
+  - web-analytics
+  - cookieless
+  - privacy
+  - GDPR
+  - openapi
+  - mcp
+  - llms-txt
+  - EU-hosted
+apis:
+  - name: Statable Stats API
+    description: >-
+      Read-focused REST HTTP API for privacy-first web analytics. Bearer (stbl_) auth, server-side only (no CORS).
+      Endpoints include GET /sites, POST /query, GET /current-visitors, GET /props, GET /funnels, POST
+      /funnels/{id}/report, GET /subscription, plus a flagged key-management write surface. Includes a public OpenAPI
+      3.1 contract, a hosted MCP server, and an llms.txt.
+    humanURL: https://statable.com/docs/developers/stats-api/overview/
+    baseURL: https://statable.com/api/v1
+    tags:
+      - analytics
+      - web-analytics
+      - cookieless
+      - privacy
+      - GDPR
+      - openapi
+      - mcp
+      - llms-txt
+      - EU-hosted
+    properties:
+      - type: OpenAPI
+        url: https://statable.com/api/v1/openapi.yaml
+      - type: MCPServer
+        url: https://mcp.statable.com/mcp
+      - type: LLMsTxt
+        url: https://statable.com/llms.txt
+      - type: LLMsTxt
+        url: https://statable.com/docs/llms-full.txt
+      - type: Documentation
+        url: https://statable.com/docs/developers/
+maintainers:
+  - FN: Key Arg B.V.
+    url: https://statable.com
+generated:
+  by: apis.io/add
+  model: claude-opus-4-8
+  confidence: 97
+  at: '2026-09-18T08:00:07.868Z'
