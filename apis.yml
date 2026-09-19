@@ -7,6 +7,16 @@ created: '2026-09-18'
 modified: '2026-09-18'
 specificationVersion: '0.21'
 tags:
+- Analytics
+- Web Analytics
+- Cookieless
+- Privacy
+- GDPR
+- OpenAPI
+- MCP
+- llms-txt
+- EU-hosted
+tags_raw:
 - analytics
 - web-analytics
 - cookieless
@@ -25,6 +35,16 @@ apis:
   humanURL: https://statable.com/docs/developers/stats-api/overview/
   baseURL: https://statable.com/api/v1
   tags:
+  - Analytics
+  - Web Analytics
+  - Cookieless
+  - Privacy
+  - GDPR
+  - OpenAPI
+  - MCP
+  - llms-txt
+  - EU-hosted
+  tags_raw:
   - analytics
   - web-analytics
   - cookieless
