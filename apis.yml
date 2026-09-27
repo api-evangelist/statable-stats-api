@@ -27,58 +27,100 @@ tags_raw:
 - llms-txt
 - EU-hosted
 apis:
-- name: Statable Stats API
-  description: Read-focused REST HTTP API for privacy-first web analytics. Bearer (stbl_) auth, server-side only (no CORS).
-    Endpoints include GET /sites, POST /query, GET /current-visitors, GET /props, GET /funnels, POST /funnels/{id}/report,
-    GET /subscription, plus a flagged key-management write surface. Includes a public OpenAPI 3.1 contract, a hosted MCP server,
-    and an llms.txt.
+- aid: statable-stats-api:statable-stats-api-bootstrap-api
+  name: Statable Stats API Bootstrap API
+  description: >-
+    Register an account and obtain its first API key without a browser. The only operations in this spec
+    that take NO bearer token. Behind the server-side `API_BOOTSTRAP_ENABLED` flag; while it is off both
+    routes answer 404 `write_disabled`. See docs/api-v1-write-surface.md §2.
   humanURL: https://statable.com/docs/developers/stats-api/overview/
   baseURL: https://statable.com/api/v1
   tags:
-  - Analytics
-  - Web Analytics
-  - Cookieless
-  - Privacy
-  - GDPR
-  - OpenAPI
-  - MCP
-  - llms-txt
-  - EU-hosted
-  tags_raw:
-  - analytics
-  - web-analytics
-  - cookieless
-  - privacy
-  - GDPR
-  - openapi
-  - mcp
-  - llms-txt
-  - EU-hosted
+  - Bootstrap
   properties:
   - type: OpenAPI
-    url: openapi/statable-stats-api-openapi.yml
-  - type: OpenAPI
-    name: OpenAPI (provider-hosted)
-    url: https://statable.com/api/v1/openapi.yaml
-  - type: MCPServer
-    url: https://mcp.statable.com/mcp
+    url: openapi/statable-stats-api-bootstrap-api-openapi.yml
   - type: ToolCrosswalk
     url: mcp/statable-stats-api-tool-crosswalk.yml
   - type: LLMsTxt
     url: https://statable.com/llms.txt
   - type: LLMsTxt
-    name: LLMsTxt (local)
     url: llms/statable-stats-api-llms.txt
   - type: Documentation
     url: https://statable.com/docs/developers/
   - type: APIReference
     url: https://statable.com/docs/developers/stats-api/endpoints/
-  image: https://statable.com/thumbnail.png
+- aid: statable-stats-api:statable-stats-api-keys-api
+  name: Statable Stats API Keys API
+  description: >-
+    Manage API keys (write surface). Requires the `keys:manage` scope and the server-side `API_WRITE_ENABLED`
+    flag; while the flag is off every route here answers 404 `write_disabled`. See docs/api-v1-write-surface.md.
+  humanURL: https://statable.com/docs/developers/stats-api/overview/
+  baseURL: https://statable.com/api/v1
+  tags:
+  - Keys
+  properties:
+  - type: OpenAPI
+    url: openapi/statable-stats-api-keys-api-openapi.yml
+  - type: ToolCrosswalk
+    url: mcp/statable-stats-api-tool-crosswalk.yml
+  - type: LLMsTxt
+    url: https://statable.com/llms.txt
+  - type: LLMsTxt
+    url: llms/statable-stats-api-llms.txt
+  - type: Documentation
+    url: https://statable.com/docs/developers/
+  - type: APIReference
+    url: https://statable.com/docs/developers/stats-api/endpoints/
+- aid: statable-stats-api:statable-stats-api-sites-api
+  name: Statable Stats API Sites API
+  description: >-
+    Create, change and delete sites (write surface). Requires the `sites:write` scope and the server-side
+    `API_WRITE_ENABLED` flag; the snippet route needs only `read`. See docs/api-v1-write-surface.md §5.
+  humanURL: https://statable.com/docs/developers/stats-api/overview/
+  baseURL: https://statable.com/api/v1
+  tags:
+  - Sites
+  properties:
+  - type: OpenAPI
+    url: openapi/statable-stats-api-sites-api-openapi.yml
+  - type: ToolCrosswalk
+    url: mcp/statable-stats-api-tool-crosswalk.yml
+  - type: LLMsTxt
+    url: https://statable.com/llms.txt
+  - type: LLMsTxt
+    url: llms/statable-stats-api-llms.txt
+  - type: Documentation
+    url: https://statable.com/docs/developers/
+  - type: APIReference
+    url: https://statable.com/docs/developers/stats-api/endpoints/
+- aid: statable-stats-api:statable-stats-api-stats-api
+  name: Statable Stats API Stats API
+  description: Read analytics data.
+  humanURL: https://statable.com/docs/developers/stats-api/overview/
+  baseURL: https://statable.com/api/v1
+  tags:
+  - Stats
+  properties:
+  - type: OpenAPI
+    url: openapi/statable-stats-api-stats-api-openapi.yml
+  - type: ToolCrosswalk
+    url: mcp/statable-stats-api-tool-crosswalk.yml
+  - type: LLMsTxt
+    url: https://statable.com/llms.txt
+  - type: LLMsTxt
+    url: llms/statable-stats-api-llms.txt
+  - type: Documentation
+    url: https://statable.com/docs/developers/
+  - type: APIReference
+    url: https://statable.com/docs/developers/stats-api/endpoints/
 maintainers:
 - FN: Key Arg B.V.
   url: https://statable.com
   email: support@statable.com
 common:
+- type: MCPServer
+  url: https://mcp.statable.com/mcp
 - type: Website
   url: https://statable.com
 - type: DeveloperPortal

@@ -1,0 +1,424 @@
+openapi: 3.2.0
+info:
+  title: Statable Stats Bootstrap API
+  version: 1.0.0
+  description: Read-only public analytics API for Statable.
+servers:
+- url: https://statable.com/api/v1
+  description: Production
+- url: https://dev.statable.com/api/v1
+  description: Development
+security:
+- bearerAuth: []
+tags:
+- name: Bootstrap
+  description: Register an account and obtain its first API key without a browser. The only operations in this spec that take NO bearer token. Behind the server-side `API_BOOTSTRAP_ENABLED` flag; while it is off both routes answer 404 `write_disabled`. See docs/api-v1-write-surface.md §2.
+paths:
+  /auth/send-otp:
+    post:
+      tags:
+      - Bootstrap
+      operationId: bootstrapSendOTP
+      summary: Email a one-time code
+      description: Sends a 6-digit code to the address, valid for a short window and usable once. Takes no credential — this is the entry point for a client that has none. Rate limited per email (2/minute), per IP (5/hour) and per IP across the whole bootstrap branch (20/hour). The response is identical whether or not the address already has an account, so it cannot be used to test for one.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BootstrapSendOTPRequest'
+            examples:
+              default:
+                value:
+                  email: agent@yourcompany.com
+      responses:
+        '200':
+          description: The code was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapSendOTPResponse'
+        '400':
+          description: '`invalid_request` — a valid email is required. `email_undeliverable` — the address can never receive mail (a reserved domain such as example.com, or a non-ASCII mailbox no provider accepts), so no code is generated and nothing is sent. `domain_not_allowed` — the address sits in a zone we do not serve.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/WriteDisabled'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /auth/verify-otp:
+    post:
+      tags:
+      - Bootstrap
+      operationId: bootstrapVerifyOTP
+      summary: Consume the code and receive the first API key
+      description: Verifies the code, creates the account if the address is new, records the terms acceptance, and returns a freshly minted key — the raw token EXACTLY ONCE. `accept_terms` must be true. Requested `scopes` must be within `API_BOOTSTRAP_SCOPES` (default `read,sites:write`); omitting them yields that whole set, and `billing:write` is never obtainable here. Everything that can be rejected without the code is validated first, so a bad field does not burn a valid code. The key is always all-sites and always expires (90 days by default, 365 max).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BootstrapVerifyOTPRequest'
+            examples:
+              provisioning:
+                summary: Register and get a key that can create sites
+                value:
+                  email: agent@yourcompany.com
+                  code: '123456'
+                  accept_terms: true
+                  key_name: provisioning bot
+              readOnly:
+                summary: Read-only key, 30 days
+                value:
+                  email: agent@yourcompany.com
+                  code: '123456'
+                  accept_terms: true
+                  scopes:
+                  - read
+                  expires_in_days: 30
+      responses:
+        '200':
+          description: The account and its first key, including the one-time token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapVerifyOTPResponse'
+        '400':
+          description: '`terms_not_accepted` (accept_terms was not true — no account is created), `invalid_request`, `invalid_scope` (outside the bootstrap allowlist), `invalid_expiry`, or `key_limit_reached` (an existing account already holds 10 active keys).
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: '`otp_invalid` — the code is wrong, expired, or already used.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/WriteDisabled'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+components:
+  responses:
+    RateLimited:
+      description: 'Hourly account (default 2000/h) or per-key (default 600/h) limit hit (`rate_limited`). Retry after the `Retry-After` seconds. The X-RateLimit-* headers report the window that tripped (account on an account limit).
+
+        '
+      headers:
+        Retry-After:
+          description: Seconds until you may retry.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    BootstrapVerifyOTPResponse:
+      type: object
+      required:
+      - token
+      - key
+      - user
+      - created
+      properties:
+        token:
+          type: string
+          description: The raw bearer token, returned exactly once.
+          examples:
+          - stbl_Z9y8X7w6…
+        key:
+          $ref: '#/components/schemas/APIKey'
+        user:
+          type: object
+          required:
+          - id
+          - email
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+        created:
+          type: boolean
+          description: 'True when this call registered a new account; false when the address already had one and simply received an additional key.
+
+            '
+    BootstrapSendOTPResponse:
+      type: object
+      required:
+      - sent
+      - email
+      properties:
+        sent:
+          type: boolean
+          description: Always true. Says nothing about whether the account existed.
+        email:
+          type: string
+          format: email
+          description: The normalized (lower-cased, trimmed) address.
+    APIKey:
+      type: object
+      description: 'The non-secret view of a key. The raw token is never stored and never appears here — only in the create/rotate responses.
+
+        '
+      required:
+      - id
+      - name
+      - prefix
+      - website_id
+      - scopes
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        prefix:
+          type: string
+          description: Non-secret fragment of the token, to identify the key in a list.
+          examples:
+          - stbl_A1b2C3d4
+        website_id:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The site the key is locked to; null = all of the owner's sites.
+        scopes:
+          type: string
+          description: Comma-separated scope set, in catalog order.
+          examples:
+          - read
+          - read,keys:manage
+        created_at:
+          type: string
+          format: date-time
+        created_ip:
+          type:
+          - string
+          - 'null'
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_ip:
+          type:
+          - string
+          - 'null'
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'null = never expires. Only dashboard-created keys can be non-expiring; keys created over the API always carry an expiry.
+
+            '
+    BootstrapVerifyOTPRequest:
+      type: object
+      required:
+      - email
+      - code
+      - accept_terms
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          description: 'The code from the email. Single-use; three wrong guesses destroy it.
+
+            '
+          examples:
+          - '123456'
+        accept_terms:
+          type: boolean
+          description: 'Must be true. Recorded server-side with the version, channel `api`, IP and User-Agent as the account''s acceptance evidence.
+
+            '
+        terms_version:
+          type: string
+          description: 'The version being accepted. Defaults to the server''s current version.
+
+            '
+          examples:
+          - '2026-07-01'
+        key_name:
+          type: string
+          maxLength: 100
+          default: agent bootstrap
+        scopes:
+          type: array
+          description: 'Must be within `API_BOOTSTRAP_SCOPES` (default `read,sites:write`). Omitted = that whole set. `billing:write` is never available here.
+
+            '
+          items:
+            type: string
+            enum:
+            - read
+            - sites:write
+            - keys:manage
+            - billing:write
+        expires_in_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 90
+    BootstrapSendOTPRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: The address that will receive the code and own the account.
+          examples:
+          - agent@yourcompany.com
+    Error:
+      type: object
+      required:
+      - error
+      - code
+      properties:
+        hint:
+          type: string
+          description: 'One sentence on what to do next. Present only on the errors a client meets while exploring (`not_found`, `method_not_allowed`); other errors omit it. Human-readable — do not branch on it.
+
+            '
+          example: 'Use one of: GET, POST.'
+        docs:
+          type: string
+          format: uri
+          description: 'Where to read more. Present together with `hint`, omitted otherwise.
+
+            '
+          example: https://statable.com/api/v1/openapi.yaml
+        request_id:
+          type: string
+          description: 'Same value as the X-Request-ID response header, repeated here because clients log bodies more often than headers. Quote it in a support request. Present on every error, including the `not_found` and `method_not_allowed` answers for a path or method that has no route.
+
+            '
+          example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+        error:
+          type: string
+          description: Human-readable detail. May be reworded — do not branch on it.
+        code:
+          type: string
+          description: 'Stable machine-readable slug (contract — never changes). The `ambiguous_domain` code is emitted only by the MCP tools (when a `site` domain matches more than one stored site), not by /query.
+
+            '
+          enum:
+          - invalid_request
+          - metrics_required
+          - unknown_metric
+          - too_many_dimensions
+          - unknown_dimension
+          - invalid_date_range
+          - invalid_interval
+          - metric_not_available
+          - invalid_filter
+          - event_filter_required
+          - invalid_compare
+          - compare_length_mismatch
+          - site_id_required
+          - limit_offset_misuse
+          - unauthorized
+          - insufficient_scope
+          - key_not_scoped
+          - tracking_inactive
+          - unknown_site
+          - unknown_funnel
+          - rate_limited
+          - internal
+          - ambiguous_domain
+          - invalid_scope
+          - scope_escalation
+          - invalid_expiry
+          - key_limit_reached
+          - api_key_not_found
+          - self_modification
+          - write_disabled
+          - terms_not_accepted
+          - otp_invalid
+          - site_exists
+          - domain_not_allowed
+          - email_undeliverable
+          - not_site_owner
+          - idempotency_conflict
+          - goal_exists
+          - goal_not_found
+          - funnel_exists
+          - hobby_always_public
+          - not_found
+          - method_not_allowed
+  headers:
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: stbl_<secret>
+      description: 'A key minted in Settings → API. All tokens start with `stbl_`. Missing, malformed, invalid, expired, or revoked → 401. Every operation in this spec requires the key''s `read` scope; without it → 403 `insufficient_scope`.
+
+        '

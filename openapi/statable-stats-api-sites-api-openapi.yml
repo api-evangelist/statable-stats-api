@@ -1,0 +1,1453 @@
+openapi: 3.2.0
+info:
+  title: Statable Stats Sites API
+  version: 1.0.0
+  description: Read-only public analytics API for Statable.
+servers:
+- url: https://statable.com/api/v1
+  description: Production
+- url: https://dev.statable.com/api/v1
+  description: Development
+security:
+- bearerAuth: []
+tags:
+- name: Sites
+  description: Create, change and delete sites (write surface). Requires the `sites:write` scope and the server-side `API_WRITE_ENABLED` flag; the snippet route needs only `read`. See docs/api-v1-write-surface.md §5.
+paths:
+  /sites:
+    post:
+      tags:
+      - Sites
+      operationId: createSite
+      summary: Create a site and get its install snippet
+      description: 'Creates a site and returns everything needed to install tracking, so provisioning is one round-trip. Requires an ALL-SITES key: a single-site key gets 403 `key_not_scoped`, since the new site would be outside its own scope. A duplicate url is 409 `site_exists` — unlike the dashboard, which permits it: for an agent a duplicate is nearly always a retry that lost its response. The first non-hobby site starts the trial subscription exactly as the dashboard does. Send an `Idempotency-Key` to make retries safe.'
+      x-required-scope: sites:write
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+        description: 'Replays the stored response for 24 hours instead of creating a second site. Reuse with a different body is 409 `idempotency_conflict`.
+
+          '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSiteRequest'
+            examples:
+              regular:
+                value:
+                  url: https://example.com
+                  timezone: Europe/Kyiv
+              hobby:
+                summary: Hobby site (domain must match a hobby suffix)
+                value:
+                  url: https://myproject.github.io
+                  hobby: true
+      responses:
+        '200':
+          description: The created site, with its script URL and snippet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteDetail'
+        '400':
+          description: '`invalid_request` — missing url, bad timezone, or a domain not eligible for hobby.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope` or `key_not_scoped` (a single-site key).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/WriteDisabled'
+        '409':
+          description: '`site_exists` or `idempotency_conflict`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Numeric site id.
+    patch:
+      tags:
+      - Sites
+      operationId: updateSite
+      summary: Change a site's url, timezone or week start
+      description: 'Owner or admin only — a member gets 403 `not_site_owner`. Omitted fields are left alone. Unlike the read surface there is no tracking-active gate: a lapsed account must still be able to fix and clean up its sites. Another account''s id answers 404 `unknown_site`, exactly as a nonexistent one.'
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSiteRequest'
+            examples:
+              timezone:
+                value:
+                  timezone: UTC
+                  week_start: 0
+      responses:
+        '200':
+          description: The updated site.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteDetail'
+        '400':
+          description: '`invalid_request` — bad url, timezone or week_start.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`write_disabled` or `unknown_site`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: '`site_exists` — the account already uses that url.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags:
+      - Sites
+      operationId: deleteSite
+      summary: Delete a site
+      description: 'Owner only — an admin may edit the site but not delete it — and it really deletes: the site plus its goals, hostnames, blocklists and import jobs, with its ClickHouse data removed asynchronously. An admin or a member gets 403 `not_site_owner` — there is no API equivalent of the dashboard''s "remove my access".'
+      x-required-scope: sites:write
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`write_disabled` or `unknown_site`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/snippet:
+    get:
+      tags:
+      - Sites
+      operationId: getSiteSnippet
+      summary: The install tag for a site
+      description: 'Returns the script URL and the ready-to-paste tag. Scope `read`, not `sites:write`: the snippet is public information (it ends up in the page source), and shared users may install tracking too. `type` selects a widget instead of the tracker: a hobby site gets the bundled `/t/` build, which counts as well as draws, a paid site the widget-only build — its counting is the tracker tag it installs separately.'
+      x-required-scope: read
+      parameters:
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - globe
+          - live-users
+          - map
+          - countries
+        description: Omit for the tracking script.
+      responses:
+        '200':
+          description: The install URL and snippet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteSnippet'
+        '400':
+          description: '`invalid_request` — unknown snippet type.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope` or `key_not_scoped`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`write_disabled` or `unknown_site`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/goals:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Numeric site id.
+    get:
+      tags:
+      - Sites
+      operationId: listSiteGoals
+      summary: The site's goals
+      description: Goal definitions with their ids, for the write calls below.
+      x-required-scope: read
+      responses:
+        '200':
+          description: The site's goals.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - goals
+                properties:
+                  goals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags:
+      - Sites
+      operationId: createGoal
+      summary: Create a goal
+      description: Owner or admin only. A duplicate name is 409 `goal_exists`.
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalRequest'
+            examples:
+              page:
+                value:
+                  name: Signup
+                  path: /thanks
+                  operator: e
+              event:
+                value:
+                  name: Newsletter
+                  event_name: newsletter_signup
+      responses:
+        '200':
+          description: The created goal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '409':
+          description: '`goal_exists`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/goals/{goalId}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    - name: goalId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    put:
+      tags:
+      - Sites
+      operationId: updateGoal
+      summary: Replace a goal
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalRequest'
+      responses:
+        '200':
+          description: The updated goal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          description: '`write_disabled`, `unknown_site`, or `goal_not_found`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: '`goal_exists`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags:
+      - Sites
+      operationId: deleteGoal
+      summary: Delete a goal
+      x-required-scope: sites:write
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          description: '`write_disabled`, `unknown_site`, or `goal_not_found`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/funnels:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Numeric site id.
+    post:
+      tags:
+      - Sites
+      operationId: createFunnel
+      summary: Create a funnel
+      description: Owner or admin only. A step pointing at a goal this site does not have is 400, naming the step. A duplicate name is 409 `funnel_exists`. Listing and running funnels lives on the read surface (GET /funnels, POST /funnels/{id}/report).
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunnelRequest'
+            examples:
+              pageThenGoal:
+                value:
+                  name: Signup flow
+                  steps:
+                  - kind: page
+                    path: /
+                  - kind: goal
+                    goal_id: 12
+      responses:
+        '200':
+          description: The created funnel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunnelDefinition'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '409':
+          description: '`funnel_exists`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/funnels/{funnelId}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    - name: funnelId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    put:
+      tags:
+      - Sites
+      operationId: updateFunnel
+      summary: Replace a funnel
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunnelRequest'
+      responses:
+        '200':
+          description: The updated funnel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunnelDefinition'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          description: '`write_disabled`, `unknown_site`, or `unknown_funnel`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: '`funnel_exists`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags:
+      - Sites
+      operationId: deleteFunnel
+      summary: Delete a funnel
+      x-required-scope: sites:write
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          description: '`write_disabled`, `unknown_site`, or `unknown_funnel`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/settings/tracking:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Numeric site id.
+    get:
+      tags:
+      - Sites
+      operationId: getTrackingSettings
+      summary: What the installed script collects
+      description: Returns the site's effective feature selection plus the full catalogue — each entry's state, its dependencies and its marginal brotli cost — so a caller can trade capability against script weight without a second call. Owner or admin only.
+      x-required-scope: sites:write
+      responses:
+        '200':
+          description: The site's tracking settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`write_disabled` or `unknown_site`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags:
+      - Sites
+      operationId: setTrackingSettings
+      summary: Set the tracking feature list
+      description: Replaces the selection wholesale. `features` is REQUIRED — an omitted key would be indistinguishable from `[]`, which disables everything optional. Locked features stay enabled whether or not they are sent, and a feature whose `requires` are unmet is rejected. Applying repoints the served bundle, then stores the selection, then purges the CDN — the same order the dashboard uses. Owner or admin only.
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrackingSettingsRequest'
+            examples:
+              minimal:
+                summary: Only the locked defaults
+                value:
+                  features: []
+              withScroll:
+                value:
+                  features:
+                  - utm
+                  - engagement
+                  - scroll
+      responses:
+        '200':
+          description: The settings after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingSettings'
+        '400':
+          description: '`invalid_request` — features omitted, unknown, or a dependency unmet.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`write_disabled` or `unknown_site`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/settings/hostnames:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - Sites
+      operationId: getHostnameSettings
+      summary: Hostname allow/block list
+      x-required-scope: read
+      responses:
+        '200':
+          description: The current setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostnameList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags:
+      - Sites
+      operationId: setHostnameSettings
+      summary: Replace the hostname lists
+      description: Owner or admin only; replaces the whole list. Unlike the dashboard equivalent this answers 400/500 on a bad body or a failed write instead of 200 with success:false — a status-checking client must not read a failure as done.
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostnameListRequest'
+      responses:
+        '200':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsCount'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/settings/blocked-ips:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - Sites
+      operationId: getBlockedIPs
+      summary: IP blocklist
+      x-required-scope: read
+      responses:
+        '200':
+          description: The current setting.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - blocked_ips
+                properties:
+                  blocked_ips:
+                    type: array
+                    description: 'Blocked client IPs, as strings. Note the asymmetry with PUT, which takes the bare array as its request body.
+
+                      '
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags:
+      - Sites
+      operationId: setBlockedIPs
+      summary: Replace the IP blocklist
+      description: Owner or admin only; replaces the whole list. Unlike the dashboard equivalent this answers 400/500 on a bad body or a failed write instead of 200 with success:false — a status-checking client must not read a failure as done.
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        '200':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsCount'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/settings/countries:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - Sites
+      operationId: getCountrySettings
+      summary: Country allow/block list
+      x-required-scope: read
+      responses:
+        '200':
+          description: The current setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags:
+      - Sites
+      operationId: setCountrySettings
+      summary: Replace the country lists
+      description: Owner or admin only; replaces the whole list. Unlike the dashboard equivalent this answers 400/500 on a bad body or a failed write instead of 200 with success:false — a status-checking client must not read a failure as done.
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CountryListRequest'
+      responses:
+        '200':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsCount'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sites/{id}/settings/public-dashboard:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - Sites
+      operationId: getPublicDashboard
+      summary: Whether the site's stats are world-readable
+      x-required-scope: read
+      responses:
+        '200':
+          description: The current setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicDashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      tags:
+      - Sites
+      operationId: setPublicDashboard
+      summary: Publish or unpublish the site's stats
+      description: 'Owner or admin only. `enabled` must be sent explicitly — this is the one setting that changes who can SEE the data, so an absent field must not read as "turn it off".
+
+
+        A hobby site on a free account is always public and answers `409 hobby_always_public` to `enabled: false`. Its stats are the widget it ships, and the hash that addresses them is already in the page''s markup; `enabled: true` on one succeeds as a no-op. An owner with a paid subscription (`active`, or `past_due` during a retried renewal) may turn it off.'
+      x-required-scope: sites:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicDashboard'
+      responses:
+        '200':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicDashboard'
+        '400':
+          $ref: '#/components/responses/SiteBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/SiteForbidden'
+        '404':
+          $ref: '#/components/responses/SiteNotFound'
+        '409':
+          description: '`hobby_always_public` — the site is hobby and its owner has no paid subscription, so it cannot be made private.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+components:
+  responses:
+    Unauthorized:
+      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'Hourly account (default 2000/h) or per-key (default 600/h) limit hit (`rate_limited`). Retry after the `Retry-After` seconds. The X-RateLimit-* headers report the window that tripped (account on an account limit).
+
+        '
+      headers:
+        Retry-After:
+          description: Seconds until you may retry.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SiteNotFound:
+      description: '`write_disabled` or `unknown_site`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SiteForbidden:
+      description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SiteBadRequest:
+      description: '`invalid_request` — the body or a field is not acceptable.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    CountryEntry:
+      type: object
+      required:
+      - code
+      - created_at
+      properties:
+        code:
+          type: string
+          description: ISO 3166-1 alpha-2.
+          example: DE
+        created_at:
+          type: string
+          format: date-time
+          description: When the country was added to the list.
+    HostnameListRequest:
+      type: object
+      description: Replaces both lists. Send [] to clear one.
+      properties:
+        allowed:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+    FunnelRequest:
+      type: object
+      required:
+      - name
+      - steps
+      properties:
+        name:
+          type: string
+        steps:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+        scope:
+          type: string
+          enum:
+          - visitor
+          - session
+          default: visitor
+        strict_order:
+          type: boolean
+    Goal:
+      type: object
+      required:
+      - id
+      - host_id
+      - name
+      properties:
+        id:
+          type: integer
+          format: int64
+        host_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        path:
+          type: string
+        operator:
+          type: string
+        event_name:
+          type: string
+        scroll_depth:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required:
+      - error
+      - code
+      properties:
+        hint:
+          type: string
+          description: 'One sentence on what to do next. Present only on the errors a client meets while exploring (`not_found`, `method_not_allowed`); other errors omit it. Human-readable — do not branch on it.
+
+            '
+          example: 'Use one of: GET, POST.'
+        docs:
+          type: string
+          format: uri
+          description: 'Where to read more. Present together with `hint`, omitted otherwise.
+
+            '
+          example: https://statable.com/api/v1/openapi.yaml
+        request_id:
+          type: string
+          description: 'Same value as the X-Request-ID response header, repeated here because clients log bodies more often than headers. Quote it in a support request. Present on every error, including the `not_found` and `method_not_allowed` answers for a path or method that has no route.
+
+            '
+          example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+        error:
+          type: string
+          description: Human-readable detail. May be reworded — do not branch on it.
+        code:
+          type: string
+          description: 'Stable machine-readable slug (contract — never changes). The `ambiguous_domain` code is emitted only by the MCP tools (when a `site` domain matches more than one stored site), not by /query.
+
+            '
+          enum:
+          - invalid_request
+          - metrics_required
+          - unknown_metric
+          - too_many_dimensions
+          - unknown_dimension
+          - invalid_date_range
+          - invalid_interval
+          - metric_not_available
+          - invalid_filter
+          - event_filter_required
+          - invalid_compare
+          - compare_length_mismatch
+          - site_id_required
+          - limit_offset_misuse
+          - unauthorized
+          - insufficient_scope
+          - key_not_scoped
+          - tracking_inactive
+          - unknown_site
+          - unknown_funnel
+          - rate_limited
+          - internal
+          - ambiguous_domain
+          - invalid_scope
+          - scope_escalation
+          - invalid_expiry
+          - key_limit_reached
+          - api_key_not_found
+          - self_modification
+          - write_disabled
+          - terms_not_accepted
+          - otp_invalid
+          - site_exists
+          - domain_not_allowed
+          - email_undeliverable
+          - not_site_owner
+          - idempotency_conflict
+          - goal_exists
+          - goal_not_found
+          - funnel_exists
+          - hobby_always_public
+          - not_found
+          - method_not_allowed
+    CountryList:
+      type: object
+      description: 'The stored lists, as GET returns them. Note the deliberate asymmetry with the PUT body: writes take bare ISO codes, reads return one entry per country with the time it was added. Both keys are always present; an empty list is [].
+
+        '
+      required:
+      - allowed
+      - blocked
+      properties:
+        allowed:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryEntry'
+        blocked:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryEntry'
+    TrackingSettingsRequest:
+      type: object
+      required:
+      - features
+      properties:
+        features:
+          type: array
+          description: 'The complete desired selection. Send [] to keep only the locked defaults. Omitting the key is an error, not "unchanged".
+
+            '
+          items:
+            type: string
+    HostnameList:
+      type: object
+      description: The stored lists, as GET returns them. Both keys are always present; an empty list is [].
+      required:
+      - allowed
+      - blocked
+      properties:
+        allowed:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+    FunnelDefinition:
+      type: object
+      description: A saved funnel definition (managed in the dashboard).
+      properties:
+        id:
+          type: integer
+          format: int64
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        scope:
+          type: string
+          enum:
+          - visitor
+          - session
+        strict_order:
+          type: boolean
+          description: When true, steps must occur in exact order (windowFunnel strict_order).
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SiteDetail:
+      type: object
+      required:
+      - site_id
+      - name
+      - hash
+      - timezone
+      - week_start
+      - hobby
+      - script_url
+      - snippet
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: The site url as stored.
+        hash:
+          type: string
+          description: Same token as in SiteSummary.hash.
+        timezone:
+          type: string
+        week_start:
+          type: integer
+        hobby:
+          type: boolean
+        script_url:
+          type: string
+        snippet:
+          type: string
+          description: The ready-to-paste script tag.
+    FunnelStep:
+      type: object
+      description: 'One step of a funnel definition. `kind` selects which other fields apply.
+
+        '
+      required:
+      - kind
+      properties:
+        kind:
+          type: string
+          enum:
+          - page
+          - event
+          - goal
+          - scroll
+          - entry_page
+          - exit_page
+        path:
+          type: string
+          description: URL path — for kind page/entry_page/exit_page.
+        operator:
+          type: string
+          description: Path match operator (e|b|c|r) — for kind page.
+        event:
+          type: string
+          description: Custom event name — for kind event.
+        prop_key:
+          type: string
+          description: Optional custom-property key — for kind event.
+        prop_value:
+          type: string
+          description: Optional custom-property value — for kind event.
+        goal_id:
+          type: integer
+          format: int64
+          description: Goal id — for kind goal.
+        threshold:
+          type: integer
+          description: Scroll depth 0..100 — for kind scroll.
+    GoalRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+          description: URL path to match.
+        operator:
+          type: string
+          enum:
+          - e
+          - b
+          - c
+          default: e
+          description: e = equals, b = begins with, c = contains.
+        event_name:
+          type: string
+          description: Match a custom event instead of a path.
+        scroll_depth:
+          type: integer
+          description: Percent scrolled.
+    TrackingSettings:
+      type: object
+      required:
+      - site_id
+      - version
+      - bundle
+      - enabled
+      - features
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          description: Catalogue version.
+        bundle:
+          type: string
+          description: The build actually served for this site.
+        enabled:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackingFeatureState'
+    CreateSiteRequest:
+      type: object
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          examples:
+          - https://example.com
+        timezone:
+          type: string
+          description: IANA zone. Omitted = the server default.
+          examples:
+          - Europe/Kyiv
+        hobby:
+          type: boolean
+          default: false
+          description: 'Request a hobby site. The domain must match a configured hobby suffix.
+
+            '
+    PublicDashboard:
+      type: object
+      required:
+      - enabled
+      properties:
+        site_id:
+          type: integer
+          format: int64
+          readOnly: true
+        enabled:
+          type: boolean
+    UpdateSiteRequest:
+      type: object
+      description: Omitted fields are left unchanged.
+      properties:
+        url:
+          type: string
+          description: Must start with http:// or https://.
+        timezone:
+          type: string
+        week_start:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = Sunday … 6 = Saturday.
+    TrackingFeatureState:
+      type: object
+      required:
+      - id
+      - label
+      - enabled
+      - locked
+      - default
+      - size_br
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        enabled:
+          type: boolean
+        locked:
+          type: boolean
+          description: Always collected; cannot be turned off.
+        default:
+          type: boolean
+        requires:
+          type: array
+          items:
+            type: string
+          description: Feature ids that must also be enabled.
+        size_br:
+          type: integer
+          description: Marginal cost in bytes, brotli-compressed.
+    SettingsCount:
+      type: object
+      required:
+      - site_id
+      - count
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        count:
+          type: integer
+          description: Entries stored after the replace.
+    SiteSnippet:
+      type: object
+      required:
+      - site_id
+      - script_url
+      - snippet
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        script_url:
+          type: string
+        snippet:
+          type: string
+          description: 'The tag to paste, ready as it stands — install it verbatim rather than rebuilding it from `script_url`. A hobby site''s tag carries a `data-id` attribute as well: its script is a `/t/` bundle addressed by hash, and that attribute is the only place the counter inside it can read the site id. A tag for a paid site needs no attributes.
+
+            '
+          examples:
+          - <script defer src="https://cdn.statable.com/js/3195799/s.js"></script>
+          - <script defer src="https://cdn.statable.com/js/07k1eD84d2/t/gw.js" data-id="3195799"></script>
+    CountryListRequest:
+      type: object
+      description: ISO 3166-1 alpha-2 codes. Replaces both lists.
+      properties:
+        allowed:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+  headers:
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: stbl_<secret>
+      description: 'A key minted in Settings → API. All tokens start with `stbl_`. Missing, malformed, invalid, expired, or revoked → 401. Every operation in this spec requires the key''s `read` scope; without it → 403 `insufficient_scope`.
+
+        '

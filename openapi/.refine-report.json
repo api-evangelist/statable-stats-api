@@ -1,0 +1,24 @@
+{
+  "provider": "statable-stats-api",
+  "sources": [
+    "statable-stats-api-openapi.yml"
+  ],
+  "outputs": [
+    "statable-stats-api-bootstrap-api-openapi.yml",
+    "statable-stats-api-keys-api-openapi.yml",
+    "statable-stats-api-sites-api-openapi.yml",
+    "statable-stats-api-stats-api-openapi.yml"
+  ],
+  "archived": [
+    "archived openapi/statable-stats-api-openapi.yml"
+  ],
+  "errors": [],
+  "warnings": [
+    "no openapi/_original/ archive: this run re-split PREVIOUSLY REFINED output, so any base URL it carries is inherited from an earlier pass rather than read from a document the provider published"
+  ],
+  "notes": [
+    "statable-stats-api-openapi.yml: upgraded openapi 3.1.0 -> OpenAPI 3.2.0",
+    "apis.yml register: written (+4 apis, 4 total)"
+  ],
+  "skipped": []
+}

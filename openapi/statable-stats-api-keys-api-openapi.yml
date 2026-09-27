@@ -1,0 +1,524 @@
+openapi: 3.2.0
+info:
+  title: Statable Stats Keys API
+  version: 1.0.0
+  description: Read-only public analytics API for Statable.
+servers:
+- url: https://statable.com/api/v1
+  description: Production
+- url: https://dev.statable.com/api/v1
+  description: Development
+security:
+- bearerAuth: []
+tags:
+- name: Keys
+  description: Manage API keys (write surface). Requires the `keys:manage` scope and the server-side `API_WRITE_ENABLED` flag; while the flag is off every route here answers 404 `write_disabled`. See docs/api-v1-write-surface.md.
+paths:
+  /keys:
+    get:
+      tags:
+      - Keys
+      operationId: listApiKeys
+      summary: List the account's active API keys
+      description: Returns the owner's active (non-revoked) keys, newest first. No token or hash is ever returned here — the raw token exists only in the create and rotate responses.
+      x-required-scope: keys:manage
+      responses:
+        '200':
+          description: The account's active keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/KeysForbidden'
+        '404':
+          $ref: '#/components/responses/WriteDisabled'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags:
+      - Keys
+      operationId: createApiKey
+      summary: Create an API key
+      description: Mints a key and returns its raw token EXACTLY ONCE. The requested scopes must be a subset of the authenticating key's scopes (else 403 `scope_escalation`), and a single-site key may only create keys locked to its own site (else 403 `key_not_scoped`). `expires_in_days` defaults to 90 and is capped at 365 — unlike the dashboard, the API cannot mint a key that never expires. Max 10 active keys per account.
+      x-required-scope: keys:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPIKeyRequest'
+            examples:
+              readOnly:
+                summary: Read-only key, default 90-day expiry
+                value:
+                  name: reporting job
+                  scopes:
+                  - read
+              singleSite:
+                summary: Key locked to one site, 30 days
+                value:
+                  name: site bot
+                  scopes:
+                  - read
+                  website_id: 3093477
+                  expires_in_days: 30
+      responses:
+        '200':
+          description: The created key, including the one-time raw token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAPIKey'
+        '400':
+          $ref: '#/components/responses/KeysBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/KeysForbidden'
+        '404':
+          description: '`write_disabled` (the write surface is off) or `unknown_site` (`website_id` does not exist or the owner cannot reach it — deliberately indistinguishable).
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /keys/{id}:
+    delete:
+      tags:
+      - Keys
+      operationId: revokeApiKey
+      summary: Revoke an API key
+      description: Revokes the key; its token stops authenticating immediately. A key cannot revoke itself (409 `self_modification`).
+      x-required-scope: keys:manage
+      parameters:
+      - $ref: '#/components/parameters/ApiKeyId'
+      responses:
+        '204':
+          description: Revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/KeysForbidden'
+        '404':
+          $ref: '#/components/responses/KeyNotFound'
+        '409':
+          $ref: '#/components/responses/SelfModification'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /keys/{id}/rotate:
+    post:
+      tags:
+      - Keys
+      operationId: rotateApiKey
+      summary: Issue a fresh secret for an API key
+      description: Replaces the key's secret in place — same id, name, site scope, scopes and expiry — and invalidates the old token immediately. The new token is returned exactly once. No request body. A key cannot rotate itself (409 `self_modification`).
+      x-required-scope: keys:manage
+      parameters:
+      - $ref: '#/components/parameters/ApiKeyId'
+      responses:
+        '200':
+          description: The rotated key, including the one-time raw token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAPIKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/KeysForbidden'
+        '404':
+          $ref: '#/components/responses/KeyNotFound'
+        '409':
+          $ref: '#/components/responses/SelfModification'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /keys/{id}/events:
+    get:
+      tags:
+      - Keys
+      operationId: listApiKeyEvents
+      summary: The key's lifecycle audit trail
+      description: Returns the key's create / rotate / revoke events, newest first (revoked keys keep their trail). `actor_key_id` names the API key that performed the action, or null when it was done from the dashboard.
+      x-required-scope: keys:manage
+      parameters:
+      - $ref: '#/components/parameters/ApiKeyId'
+      responses:
+        '200':
+          description: The key's audit trail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyEventList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/KeysForbidden'
+        '404':
+          $ref: '#/components/responses/KeyNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+components:
+  responses:
+    Unauthorized:
+      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'Hourly account (default 2000/h) or per-key (default 600/h) limit hit (`rate_limited`). Retry after the `Retry-After` seconds. The X-RateLimit-* headers report the window that tripped (account on an account limit).
+
+        '
+      headers:
+        Retry-After:
+          description: Seconds until you may retry.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    KeyNotFound:
+      description: '`api_key_not_found` — unknown, already revoked, or another account''s key id (deliberately indistinguishable). Or `write_disabled` when the write surface is off.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SelfModification:
+      description: '`self_modification` — a key may not rotate or revoke itself, so an agent cannot destroy the credential it is mid-flow with.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    KeysBadRequest:
+      description: 'Invalid request. Branch on the stable `code`: invalid_request (malformed body or a name outside 1–100 characters), invalid_scope (scope not in the vocabulary), invalid_expiry (expires_in_days outside 1–365), key_limit_reached (10 active keys already).
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    KeysForbidden:
+      description: '`insufficient_scope` (the key lacks `keys:manage`), `scope_escalation` (requested scopes exceed the authenticating key''s scopes) or `key_not_scoped` (a single-site key tried to widen its site scope).
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    APIKeyList:
+      type: object
+      required:
+      - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKey'
+    APIKey:
+      type: object
+      description: 'The non-secret view of a key. The raw token is never stored and never appears here — only in the create/rotate responses.
+
+        '
+      required:
+      - id
+      - name
+      - prefix
+      - website_id
+      - scopes
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        prefix:
+          type: string
+          description: Non-secret fragment of the token, to identify the key in a list.
+          examples:
+          - stbl_A1b2C3d4
+        website_id:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The site the key is locked to; null = all of the owner's sites.
+        scopes:
+          type: string
+          description: Comma-separated scope set, in catalog order.
+          examples:
+          - read
+          - read,keys:manage
+        created_at:
+          type: string
+          format: date-time
+        created_ip:
+          type:
+          - string
+          - 'null'
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_ip:
+          type:
+          - string
+          - 'null'
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'null = never expires. Only dashboard-created keys can be non-expiring; keys created over the API always carry an expiry.
+
+            '
+    Error:
+      type: object
+      required:
+      - error
+      - code
+      properties:
+        hint:
+          type: string
+          description: 'One sentence on what to do next. Present only on the errors a client meets while exploring (`not_found`, `method_not_allowed`); other errors omit it. Human-readable — do not branch on it.
+
+            '
+          example: 'Use one of: GET, POST.'
+        docs:
+          type: string
+          format: uri
+          description: 'Where to read more. Present together with `hint`, omitted otherwise.
+
+            '
+          example: https://statable.com/api/v1/openapi.yaml
+        request_id:
+          type: string
+          description: 'Same value as the X-Request-ID response header, repeated here because clients log bodies more often than headers. Quote it in a support request. Present on every error, including the `not_found` and `method_not_allowed` answers for a path or method that has no route.
+
+            '
+          example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+        error:
+          type: string
+          description: Human-readable detail. May be reworded — do not branch on it.
+        code:
+          type: string
+          description: 'Stable machine-readable slug (contract — never changes). The `ambiguous_domain` code is emitted only by the MCP tools (when a `site` domain matches more than one stored site), not by /query.
+
+            '
+          enum:
+          - invalid_request
+          - metrics_required
+          - unknown_metric
+          - too_many_dimensions
+          - unknown_dimension
+          - invalid_date_range
+          - invalid_interval
+          - metric_not_available
+          - invalid_filter
+          - event_filter_required
+          - invalid_compare
+          - compare_length_mismatch
+          - site_id_required
+          - limit_offset_misuse
+          - unauthorized
+          - insufficient_scope
+          - key_not_scoped
+          - tracking_inactive
+          - unknown_site
+          - unknown_funnel
+          - rate_limited
+          - internal
+          - ambiguous_domain
+          - invalid_scope
+          - scope_escalation
+          - invalid_expiry
+          - key_limit_reached
+          - api_key_not_found
+          - self_modification
+          - write_disabled
+          - terms_not_accepted
+          - otp_invalid
+          - site_exists
+          - domain_not_allowed
+          - email_undeliverable
+          - not_site_owner
+          - idempotency_conflict
+          - goal_exists
+          - goal_not_found
+          - funnel_exists
+          - hobby_always_public
+          - not_found
+          - method_not_allowed
+    APIKeyEventList:
+      type: object
+      required:
+      - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKeyEvent'
+    APIKeyEvent:
+      type: object
+      required:
+      - event
+      - created_at
+      properties:
+        event:
+          type: string
+          enum:
+          - created
+          - rotated
+          - revoked
+        ip:
+          type:
+          - string
+          - 'null'
+        user_agent:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        actor_key_id:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The API key that performed the action; null = the dashboard.
+    CreateAPIKeyRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        scopes:
+          type: array
+          description: 'Defaults to ["read"]. Must be a subset of the authenticating key''s scopes, else 403 scope_escalation.
+
+            '
+          items:
+            type: string
+            enum:
+            - read
+            - sites:write
+            - keys:manage
+            - billing:write
+        website_id:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: 'Lock the new key to one site. Omit/null = all of the owner''s sites. A single-site key MUST pass its own site id here.
+
+            '
+        expires_in_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 90
+          description: Outside 1–365 → 400 invalid_expiry.
+    CreatedAPIKey:
+      description: 'The created (or rotated) key plus its raw token. The token is returned exactly once and cannot be retrieved later.
+
+        '
+      allOf:
+      - $ref: '#/components/schemas/APIKey'
+      - type: object
+        required:
+        - token
+        properties:
+          token:
+            type: string
+            description: The raw bearer token. Store it now.
+            examples:
+            - stbl_Z9y8X7w6…
+  headers:
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+  parameters:
+    ApiKeyId:
+      name: id
+      in: path
+      required: true
+      description: Numeric API key id (from GET /keys).
+      schema:
+        type: integer
+        format: int64
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: stbl_<secret>
+      description: 'A key minted in Settings → API. All tokens start with `stbl_`. Missing, malformed, invalid, expired, or revoked → 401. Every operation in this spec requires the key''s `read` scope; without it → 403 `insufficient_scope`.
+
+        '
