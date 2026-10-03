@@ -410,25 +410,60 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 components:
-  schemas:
-    DateRange:
-      description: 'A scalar string — a preset (`7d`/`30d` = last N full days; `month` = current calendar month to date; `realtime` = last ~30 min) or a bare `Nd` for the last N days, N in 1–90 (e.g. `14d`) — OR a custom inclusive `[from, to]` pair of `YYYY-MM-DD` dates with `from <= to` and a span of at most 366 days. The scalar forms are exactly what `GET /sites` accepts; for a window over 90 days use a custom pair.
+  headers:
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
 
         '
-      oneOf:
-      - type: string
-        pattern: ^(month|realtime|([1-9]|[1-8][0-9]|90)d)$
-      - type: array
-        minItems: 2
-        maxItems: 2
-        items:
-          type: string
-          format: date
-      examples:
-      - 7d
-      - 14d
-      - - '2026-06-01'
-        - '2026-06-30'
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+  schemas:
+    FunnelReportResponse:
+      type: object
+      properties:
+        funnel:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            name:
+              type: string
+            scope:
+              type: string
+              enum:
+              - visitor
+              - session
+            strict_order:
+              type: boolean
+        entering:
+          type: integer
+          format: int64
+          description: Visitors that reached step 0 — the funnel's denominator.
+        all_visitors:
+          type: integer
+          format: int64
+          description: Total visitors/visits in the period (funnel-independent).
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelReportStep'
+        query:
+          type: object
+          description: The resolved request (site_id, funnel_id, normalized date_range, filters).
     ResultRow:
       type: object
       properties:
@@ -463,48 +498,48 @@ components:
                 type: number
               change:
                 type: number
-    SiteStats:
-      type: object
-      properties:
-        date_range:
-          type: string
-        metrics:
-          type: object
-          additionalProperties:
-            type: number
-    QueryResponse:
+    SitesResponse:
       type: object
       required:
-      - results
-      - query
+      - sites
       properties:
-        results:
+        sites:
           type: array
           items:
-            $ref: '#/components/schemas/ResultRow'
-        meta:
-          $ref: '#/components/schemas/Meta'
-        query:
-          $ref: '#/components/schemas/QueryEcho'
-        has_import:
-          type: boolean
-          description: True when the site has imported (e.g. GA4) data overlapping the queried window.
-    FunnelReportRequest:
+            $ref: '#/components/schemas/SiteSummary'
+    QueryEcho:
       type: object
-      required:
-      - date_range
+      description: Echo of the resolved request.
       properties:
         site_id:
           type: integer
           format: int64
-          description: Optional for a single-site key; required for an all-sites key.
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/Metric'
         date_range:
-          $ref: '#/components/schemas/DateRange'
+          type: array
+          description: Always the resolved concrete [from, to] YYYY-MM-DD window (presets normalized).
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+            format: date
+        compare_date_range:
+          type: array
+          description: Present only when `compare` was set — the resolved [from, to] of the compare window.
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+            format: date
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dimension'
         filters:
           type: array
-          description: 'Segment/session filters only (country, browser, os, device, source, channel, referrer, utm_*, entry_page, exit_page, hostname). Event-level fields (event, page, code) return `invalid_filter`.
-
-            '
           items:
             $ref: '#/components/schemas/Filter'
     Error:
@@ -584,175 +619,6 @@ components:
           - hobby_always_public
           - not_found
           - method_not_allowed
-    SiteSummary:
-      type: object
-      required:
-      - site_id
-      - name
-      - hash
-      - timezone
-      - hobby
-      properties:
-        site_id:
-          type: integer
-          format: int64
-          description: The numeric id you pass as `site_id` to /query.
-        name:
-          type: string
-          description: 'The site''s domain. For the configured public demo site this is masked to `example.com` — see "The demo site is masked" in docs/public-api-v1.md; breakdown values carrying the host are masked the same way.
-
-            '
-        hash:
-          type: string
-          description: 'The site''s public token, used by widget script URLs and the shared dashboard link. Integrations need it and previously had to parse it out of a widget snippet URL — which only worked for hobby sites, since a paid site''s tracker URL is keyed by the numeric id.
-
-            '
-        timezone:
-          type: string
-          description: The site's reporting timezone.
-        hobby:
-          type: boolean
-          description: 'True for a site on the free plan. It decides how the site counts at all: a hobby site is tracked by the bundled `/t/` build (widget plus counter) carrying a `data-id` attribute, and an event reaching us from any other build is refused. Install `GET /sites/{id}/snippet` verbatim and this is handled for you; branch on it only if you build the tag yourself.
-
-            '
-        stats_start_date:
-          type:
-          - string
-          - 'null'
-          format: date
-          description: Stored value only (not computed on the fly); null if not yet computed.
-        created_at:
-          type: string
-          format: date-time
-        stats:
-          $ref: '#/components/schemas/SiteStats'
-    QueryEcho:
-      type: object
-      description: Echo of the resolved request.
-      properties:
-        site_id:
-          type: integer
-          format: int64
-        metrics:
-          type: array
-          items:
-            $ref: '#/components/schemas/Metric'
-        date_range:
-          type: array
-          description: Always the resolved concrete [from, to] YYYY-MM-DD window (presets normalized).
-          minItems: 2
-          maxItems: 2
-          items:
-            type: string
-            format: date
-        compare_date_range:
-          type: array
-          description: Present only when `compare` was set — the resolved [from, to] of the compare window.
-          minItems: 2
-          maxItems: 2
-          items:
-            type: string
-            format: date
-        dimensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Dimension'
-        filters:
-          type: array
-          items:
-            $ref: '#/components/schemas/Filter'
-    FunnelDefinition:
-      type: object
-      description: A saved funnel definition (managed in the dashboard).
-      properties:
-        id:
-          type: integer
-          format: int64
-        site_id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        scope:
-          type: string
-          enum:
-          - visitor
-          - session
-        strict_order:
-          type: boolean
-          description: When true, steps must occur in exact order (windowFunnel strict_order).
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/FunnelStep'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    FunnelReportResponse:
-      type: object
-      properties:
-        funnel:
-          type: object
-          properties:
-            id:
-              type: integer
-              format: int64
-            name:
-              type: string
-            scope:
-              type: string
-              enum:
-              - visitor
-              - session
-            strict_order:
-              type: boolean
-        entering:
-          type: integer
-          format: int64
-          description: Visitors that reached step 0 — the funnel's denominator.
-        all_visitors:
-          type: integer
-          format: int64
-          description: Total visitors/visits in the period (funnel-independent).
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/FunnelReportStep'
-        query:
-          type: object
-          description: The resolved request (site_id, funnel_id, normalized date_range, filters).
-    FunnelReportStep:
-      type: object
-      description: One step's outcome. Steps are ordered — do not sort them.
-      properties:
-        index:
-          type: integer
-          description: 0-based position in the funnel.
-        name:
-          type: string
-        kind:
-          type: string
-          enum:
-          - page
-          - event
-          - goal
-          - scroll
-          - entry_page
-          - exit_page
-        visitors:
-          type: integer
-          format: int64
-          description: Visitors/visits that reached this step.
-        conversion_rate:
-          type: number
-          description: visitors / entering * 100 — cumulative vs the first step, NOT step-to-step.
-        dropoff:
-          type: integer
-          format: int64
-          description: Visitors lost versus the previous step.
     FunnelStep:
       type: object
       description: 'One step of a funnel definition. `kind` selects which other fields apply.
@@ -810,6 +676,165 @@ components:
       - time_on_page
       - scroll_depth
       - exit_rate
+    Meta:
+      type: object
+      description: Present only on breakdown responses.
+      properties:
+        total:
+          type: integer
+          description: Total distinct values for the window, across all pages.
+        limit:
+          type: integer
+          description: Effective limit after clamping.
+        offset:
+          type: integer
+        has_more:
+          type: boolean
+          description: True when offset + returned rows < total. Page again with offset += limit.
+    FunnelDefinition:
+      type: object
+      description: A saved funnel definition (managed in the dashboard).
+      properties:
+        id:
+          type: integer
+          format: int64
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        scope:
+          type: string
+          enum:
+          - visitor
+          - session
+        strict_order:
+          type: boolean
+          description: When true, steps must occur in exact order (windowFunnel strict_order).
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DateRange:
+      description: 'A scalar string — a preset (`7d`/`30d` = last N full days; `month` = current calendar month to date; `realtime` = last ~30 min) or a bare `Nd` for the last N days, N in 1–90 (e.g. `14d`) — OR a custom inclusive `[from, to]` pair of `YYYY-MM-DD` dates with `from <= to` and a span of at most 366 days. The scalar forms are exactly what `GET /sites` accepts; for a window over 90 days use a custom pair.
+
+        '
+      oneOf:
+      - type: string
+        pattern: ^(month|realtime|([1-9]|[1-8][0-9]|90)d)$
+      - type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          format: date
+      examples:
+      - 7d
+      - 14d
+      - - '2026-06-01'
+        - '2026-06-30'
+    FunnelReportRequest:
+      type: object
+      required:
+      - date_range
+      properties:
+        site_id:
+          type: integer
+          format: int64
+          description: Optional for a single-site key; required for an all-sites key.
+        date_range:
+          $ref: '#/components/schemas/DateRange'
+        filters:
+          type: array
+          description: 'Segment/session filters only (country, browser, os, device, source, channel, referrer, utm_*, entry_page, exit_page, hostname). Event-level fields (event, page, code) return `invalid_filter`.
+
+            '
+          items:
+            $ref: '#/components/schemas/Filter'
+    SiteSummary:
+      type: object
+      required:
+      - site_id
+      - name
+      - hash
+      - timezone
+      - hobby
+      properties:
+        site_id:
+          type: integer
+          format: int64
+          description: The numeric id you pass as `site_id` to /query.
+        name:
+          type: string
+          description: 'The site''s domain. For the configured public demo site this is masked to `example.com` — see "The demo site is masked" in docs/public-api-v1.md; breakdown values carrying the host are masked the same way.
+
+            '
+        hash:
+          type: string
+          description: 'The site''s public token, used by widget script URLs and the shared dashboard link. Integrations need it and previously had to parse it out of a widget snippet URL — which only worked for hobby sites, since a paid site''s tracker URL is keyed by the numeric id.
+
+            '
+        timezone:
+          type: string
+          description: The site's reporting timezone.
+        hobby:
+          type: boolean
+          description: 'True for a site on the free plan. It decides how the site counts at all: a hobby site is tracked by the bundled `/t/` build (widget plus counter) carrying a `data-id` attribute, and an event reaching us from any other build is refused. Install `GET /sites/{id}/snippet` verbatim and this is handled for you; branch on it only if you build the tag yourself.
+
+            '
+        stats_start_date:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Stored value only (not computed on the fly); null if not yet computed.
+        created_at:
+          type: string
+          format: date-time
+        stats:
+          $ref: '#/components/schemas/SiteStats'
+    Dimension:
+      type: string
+      description: 'At most one per query. A time dimension yields a series; a breakdown dimension yields top-N rows. Not every metric is valid for every breakdown — a metric the builder does not compute returns `metric_not_available`. In addition to the enum below, a dynamic `event:props:<key>` dimension breaks a custom event down by one of its property values (metrics `visitors` + `events`); it requires an `event` filter to name the event, else `event_filter_required`.
+
+        '
+      enum:
+      - time
+      - time:minute
+      - time:hour
+      - time:day
+      - time:week
+      - time:month
+      - visit:source
+      - visit:referrer
+      - visit:channel
+      - visit:utm_source
+      - visit:utm_medium
+      - visit:utm_campaign
+      - visit:utm_content
+      - visit:utm_term
+      - visit:country
+      - visit:region
+      - visit:city
+      - visit:browser
+      - visit:browser_version
+      - visit:os
+      - visit:os_version
+      - visit:device
+      - visit:entry_page
+      - visit:exit_page
+      - event:page
+      - event:folder
+      - event:hostname
+      - event:name
+      - event:goal
+      - event:status_code
     QueryRequest:
       type: object
       additionalProperties: false
@@ -914,69 +939,66 @@ components:
           description: OR-ed together. A value may not contain a comma.
           items:
             type: string
-    Dimension:
-      type: string
-      description: 'At most one per query. A time dimension yields a series; a breakdown dimension yields top-N rows. Not every metric is valid for every breakdown — a metric the builder does not compute returns `metric_not_available`. In addition to the enum below, a dynamic `event:props:<key>` dimension breaks a custom event down by one of its property values (metrics `visitors` + `events`); it requires an `event` filter to name the event, else `event_filter_required`.
-
-        '
-      enum:
-      - time
-      - time:minute
-      - time:hour
-      - time:day
-      - time:week
-      - time:month
-      - visit:source
-      - visit:referrer
-      - visit:channel
-      - visit:utm_source
-      - visit:utm_medium
-      - visit:utm_campaign
-      - visit:utm_content
-      - visit:utm_term
-      - visit:country
-      - visit:region
-      - visit:city
-      - visit:browser
-      - visit:browser_version
-      - visit:os
-      - visit:os_version
-      - visit:device
-      - visit:entry_page
-      - visit:exit_page
-      - event:page
-      - event:folder
-      - event:hostname
-      - event:name
-      - event:goal
-      - event:status_code
-    Meta:
-      type: object
-      description: Present only on breakdown responses.
-      properties:
-        total:
-          type: integer
-          description: Total distinct values for the window, across all pages.
-        limit:
-          type: integer
-          description: Effective limit after clamping.
-        offset:
-          type: integer
-        has_more:
-          type: boolean
-          description: True when offset + returned rows < total. Page again with offset += limit.
-    SitesResponse:
+    QueryResponse:
       type: object
       required:
-      - sites
+      - results
+      - query
       properties:
-        sites:
+        results:
           type: array
           items:
-            $ref: '#/components/schemas/SiteSummary'
+            $ref: '#/components/schemas/ResultRow'
+        meta:
+          $ref: '#/components/schemas/Meta'
+        query:
+          $ref: '#/components/schemas/QueryEcho'
+        has_import:
+          type: boolean
+          description: True when the site has imported (e.g. GA4) data overlapping the queried window.
+    SiteStats:
+      type: object
+      properties:
+        date_range:
+          type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+    FunnelReportStep:
+      type: object
+      description: One step's outcome. Steps are ordered — do not sort them.
+      properties:
+        index:
+          type: integer
+          description: 0-based position in the funnel.
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - page
+          - event
+          - goal
+          - scroll
+          - entry_page
+          - exit_page
+        visitors:
+          type: integer
+          format: int64
+          description: Visitors/visits that reached this step.
+        conversion_rate:
+          type: number
+          description: visitors / entering * 100 — cumulative vs the first step, NOT step-to-step.
+        dropoff:
+          type: integer
+          format: int64
+          description: Visitors lost versus the previous step.
   responses:
-    Unauthorized:
-      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+    BadRequest:
+      description: 'Invalid request. Branch on the stable `code`: invalid_request, metrics_required, unknown_metric, too_many_dimensions, unknown_dimension, invalid_date_range, invalid_interval, metric_not_available, invalid_filter, event_filter_required, invalid_compare, compare_length_mismatch, site_id_required, limit_offset_misuse.
+
+        '
       content:
         application/json:
           schema:
@@ -985,6 +1007,20 @@ components:
       description: '`unknown_site` — the `site_id` does not exist OR the key''s owner has no access. Deliberately indistinguishable (same status AND code) so a key cannot enumerate which site_ids exist. `unknown_funnel` (funnel endpoints only) — the funnel id is not found for the resolved site.
 
         '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: '`insufficient_scope` (the key lacks the `read` scope every endpoint here requires), `key_not_scoped` (single-site key asked for a different site) or `tracking_inactive` (the site''s tracking has stopped).
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
       content:
         application/json:
           schema:
@@ -1019,42 +1055,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: 'Invalid request. Branch on the stable `code`: invalid_request, metrics_required, unknown_metric, too_many_dimensions, unknown_dimension, invalid_date_range, invalid_interval, metric_not_available, invalid_filter, event_filter_required, invalid_compare, compare_length_mismatch, site_id_required, limit_offset_misuse.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Forbidden:
-      description: '`insufficient_scope` (the key lacks the `read` scope every endpoint here requires), `key_not_scoped` (single-site key asked for a different site) or `tracking_inactive` (the site''s tracking has stopped).
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-  headers:
-    X-Request-ID:
-      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
-
-        '
-      schema:
-        type: string
-        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
-    X-RateLimit-Limit:
-      description: The per-key hourly rate limit for your plan.
-      schema:
-        type: integer
-    X-RateLimit-Reset:
-      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
-      schema:
-        type: integer
-    X-RateLimit-Remaining:
-      description: Requests left in the current per-key window.
-      schema:
-        type: integer
   securitySchemes:
     bearerAuth:
       type: http
