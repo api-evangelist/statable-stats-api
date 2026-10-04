@@ -112,133 +112,7 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 components:
-  headers:
-    X-RateLimit-Remaining:
-      description: Requests left in the current per-key window.
-      schema:
-        type: integer
-    X-RateLimit-Reset:
-      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
-      schema:
-        type: integer
-    X-Request-ID:
-      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
-
-        '
-      schema:
-        type: string
-        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
-    X-RateLimit-Limit:
-      description: The per-key hourly rate limit for your plan.
-      schema:
-        type: integer
   schemas:
-    BootstrapVerifyOTPResponse:
-      type: object
-      required:
-      - token
-      - key
-      - user
-      - created
-      properties:
-        token:
-          type: string
-          description: The raw bearer token, returned exactly once.
-          examples:
-          - stbl_Z9y8X7w6…
-        key:
-          $ref: '#/components/schemas/APIKey'
-        user:
-          type: object
-          required:
-          - id
-          - email
-          properties:
-            id:
-              type: string
-              format: uuid
-            email:
-              type: string
-              format: email
-        created:
-          type: boolean
-          description: 'True when this call registered a new account; false when the address already had one and simply received an additional key.
-
-            '
-    BootstrapSendOTPResponse:
-      type: object
-      required:
-      - sent
-      - email
-      properties:
-        sent:
-          type: boolean
-          description: Always true. Says nothing about whether the account existed.
-        email:
-          type: string
-          format: email
-          description: The normalized (lower-cased, trimmed) address.
-    BootstrapSendOTPRequest:
-      type: object
-      required:
-      - email
-      properties:
-        email:
-          type: string
-          format: email
-          description: The address that will receive the code and own the account.
-          examples:
-          - agent@yourcompany.com
-    BootstrapVerifyOTPRequest:
-      type: object
-      required:
-      - email
-      - code
-      - accept_terms
-      properties:
-        email:
-          type: string
-          format: email
-        code:
-          type: string
-          description: 'The code from the email. Single-use; three wrong guesses destroy it.
-
-            '
-          examples:
-          - '123456'
-        accept_terms:
-          type: boolean
-          description: 'Must be true. Recorded server-side with the version, channel `api`, IP and User-Agent as the account''s acceptance evidence.
-
-            '
-        terms_version:
-          type: string
-          description: 'The version being accepted. Defaults to the server''s current version.
-
-            '
-          examples:
-          - '2026-07-01'
-        key_name:
-          type: string
-          maxLength: 100
-          default: agent bootstrap
-        scopes:
-          type: array
-          description: 'Must be within `API_BOOTSTRAP_SCOPES` (default `read,sites:write`). Omitted = that whole set. `billing:write` is never available here.
-
-            '
-          items:
-            type: string
-            enum:
-            - read
-            - sites:write
-            - keys:manage
-            - billing:write
-        expires_in_days:
-          type: integer
-          minimum: 1
-          maximum: 365
-          default: 90
     APIKey:
       type: object
       description: 'The non-secret view of a key. The raw token is never stored and never appears here — only in the create/rotate responses.
@@ -298,6 +172,49 @@ components:
           description: 'null = never expires. Only dashboard-created keys can be non-expiring; keys created over the API always carry an expiry.
 
             '
+    BootstrapVerifyOTPResponse:
+      type: object
+      required:
+      - token
+      - key
+      - user
+      - created
+      properties:
+        token:
+          type: string
+          description: The raw bearer token, returned exactly once.
+          examples:
+          - stbl_Z9y8X7w6…
+        key:
+          $ref: '#/components/schemas/APIKey'
+        user:
+          type: object
+          required:
+          - id
+          - email
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+        created:
+          type: boolean
+          description: 'True when this call registered a new account; false when the address already had one and simply received an additional key.
+
+            '
+    BootstrapSendOTPRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: The address that will receive the code and own the account.
+          examples:
+          - agent@yourcompany.com
     Error:
       type: object
       required:
@@ -375,26 +292,70 @@ components:
           - hobby_always_public
           - not_found
           - method_not_allowed
+    BootstrapVerifyOTPRequest:
+      type: object
+      required:
+      - email
+      - code
+      - accept_terms
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          description: 'The code from the email. Single-use; three wrong guesses destroy it.
+
+            '
+          examples:
+          - '123456'
+        accept_terms:
+          type: boolean
+          description: 'Must be true. Recorded server-side with the version, channel `api`, IP and User-Agent as the account''s acceptance evidence.
+
+            '
+        terms_version:
+          type: string
+          description: 'The version being accepted. Defaults to the server''s current version.
+
+            '
+          examples:
+          - '2026-07-01'
+        key_name:
+          type: string
+          maxLength: 100
+          default: agent bootstrap
+        scopes:
+          type: array
+          description: 'Must be within `API_BOOTSTRAP_SCOPES` (default `read,sites:write`). Omitted = that whole set. `billing:write` is never available here.
+
+            '
+          items:
+            type: string
+            enum:
+            - read
+            - sites:write
+            - keys:manage
+            - billing:write
+        expires_in_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 90
+    BootstrapSendOTPResponse:
+      type: object
+      required:
+      - sent
+      - email
+      properties:
+        sent:
+          type: boolean
+          description: Always true. Says nothing about whether the account existed.
+        email:
+          type: string
+          format: email
+          description: The normalized (lower-cased, trimmed) address.
   responses:
-    WriteDisabled:
-      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Internal:
-      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
-
-        '
-      headers:
-        X-Request-ID:
-          $ref: '#/components/headers/X-Request-ID'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
     RateLimited:
       description: 'Hourly account (default 2000/h) or per-key (default 600/h) limit hit (`rate_limited`). Retry after the `Retry-After` seconds. The X-RateLimit-* headers report the window that tripped (account on an account limit).
 
@@ -414,6 +375,45 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  headers:
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
   securitySchemes:
     bearerAuth:
       type: http

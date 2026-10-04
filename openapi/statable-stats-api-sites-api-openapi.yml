@@ -893,27 +893,46 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 components:
-  headers:
-    X-RateLimit-Remaining:
-      description: Requests left in the current per-key window.
-      schema:
-        type: integer
-    X-RateLimit-Reset:
-      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
-      schema:
-        type: integer
-    X-Request-ID:
-      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+  schemas:
+    FunnelStep:
+      type: object
+      description: 'One step of a funnel definition. `kind` selects which other fields apply.
 
         '
-      schema:
-        type: string
-        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
-    X-RateLimit-Limit:
-      description: The per-key hourly rate limit for your plan.
-      schema:
-        type: integer
-  schemas:
+      required:
+      - kind
+      properties:
+        kind:
+          type: string
+          enum:
+          - page
+          - event
+          - goal
+          - scroll
+          - entry_page
+          - exit_page
+        path:
+          type: string
+          description: URL path — for kind page/entry_page/exit_page.
+        operator:
+          type: string
+          description: Path match operator (e|b|c|r) — for kind page.
+        event:
+          type: string
+          description: Custom event name — for kind event.
+        prop_key:
+          type: string
+          description: Optional custom-property key — for kind event.
+        prop_value:
+          type: string
+          description: Optional custom-property value — for kind event.
+        goal_id:
+          type: integer
+          format: int64
+          description: Goal id — for kind goal.
+        threshold:
+          type: integer
+          description: Scroll depth 0..100 — for kind scroll.
     CreateSiteRequest:
       type: object
       required:
@@ -934,58 +953,18 @@ components:
           description: 'Request a hobby site. The domain must match a configured hobby suffix.
 
             '
-    GoalRequest:
+    TrackingSettingsRequest:
       type: object
       required:
-      - name
+      - features
       properties:
-        name:
-          type: string
-        path:
-          type: string
-          description: URL path to match.
-        operator:
-          type: string
-          enum:
-          - e
-          - b
-          - c
-          default: e
-          description: e = equals, b = begins with, c = contains.
-        event_name:
-          type: string
-          description: Match a custom event instead of a path.
-        scroll_depth:
-          type: integer
-          description: Percent scrolled.
-    PublicDashboard:
-      type: object
-      required:
-      - enabled
-      properties:
-        site_id:
-          type: integer
-          format: int64
-          readOnly: true
-        enabled:
-          type: boolean
-    CountryList:
-      type: object
-      description: 'The stored lists, as GET returns them. Note the deliberate asymmetry with the PUT body: writes take bare ISO codes, reads return one entry per country with the time it was added. Both keys are always present; an empty list is [].
+        features:
+          type: array
+          description: 'The complete desired selection. Send [] to keep only the locked defaults. Omitting the key is an error, not "unchanged".
 
-        '
-      required:
-      - allowed
-      - blocked
-      properties:
-        allowed:
-          type: array
+            '
           items:
-            $ref: '#/components/schemas/CountryEntry'
-        blocked:
-          type: array
-          items:
-            $ref: '#/components/schemas/CountryEntry'
+            type: string
     Error:
       type: object
       required:
@@ -1063,133 +1042,6 @@ components:
           - hobby_always_public
           - not_found
           - method_not_allowed
-    FunnelStep:
-      type: object
-      description: 'One step of a funnel definition. `kind` selects which other fields apply.
-
-        '
-      required:
-      - kind
-      properties:
-        kind:
-          type: string
-          enum:
-          - page
-          - event
-          - goal
-          - scroll
-          - entry_page
-          - exit_page
-        path:
-          type: string
-          description: URL path — for kind page/entry_page/exit_page.
-        operator:
-          type: string
-          description: Path match operator (e|b|c|r) — for kind page.
-        event:
-          type: string
-          description: Custom event name — for kind event.
-        prop_key:
-          type: string
-          description: Optional custom-property key — for kind event.
-        prop_value:
-          type: string
-          description: Optional custom-property value — for kind event.
-        goal_id:
-          type: integer
-          format: int64
-          description: Goal id — for kind goal.
-        threshold:
-          type: integer
-          description: Scroll depth 0..100 — for kind scroll.
-    TrackingSettingsRequest:
-      type: object
-      required:
-      - features
-      properties:
-        features:
-          type: array
-          description: 'The complete desired selection. Send [] to keep only the locked defaults. Omitting the key is an error, not "unchanged".
-
-            '
-          items:
-            type: string
-    HostnameListRequest:
-      type: object
-      description: Replaces both lists. Send [] to clear one.
-      properties:
-        allowed:
-          type: array
-          items:
-            type: string
-        blocked:
-          type: array
-          items:
-            type: string
-    FunnelDefinition:
-      type: object
-      description: A saved funnel definition (managed in the dashboard).
-      properties:
-        id:
-          type: integer
-          format: int64
-        site_id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        scope:
-          type: string
-          enum:
-          - visitor
-          - session
-        strict_order:
-          type: boolean
-          description: When true, steps must occur in exact order (windowFunnel strict_order).
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/FunnelStep'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    CountryEntry:
-      type: object
-      required:
-      - code
-      - created_at
-      properties:
-        code:
-          type: string
-          description: ISO 3166-1 alpha-2.
-          example: DE
-        created_at:
-          type: string
-          format: date-time
-          description: When the country was added to the list.
-    SiteSnippet:
-      type: object
-      required:
-      - site_id
-      - script_url
-      - snippet
-      properties:
-        site_id:
-          type: integer
-          format: int64
-        script_url:
-          type: string
-        snippet:
-          type: string
-          description: 'The tag to paste, ready as it stands — install it verbatim rather than rebuilding it from `script_url`. A hobby site''s tag carries a `data-id` attribute as well: its script is a `/t/` bundle addressed by hash, and that attribute is the only place the counter inside it can read the site id. A tag for a paid site needs no attributes.
-
-            '
-          examples:
-          - <script defer src="https://cdn.statable.com/js/3195799/s.js"></script>
-          - <script defer src="https://cdn.statable.com/js/07k1eD84d2/t/gw.js" data-id="3195799"></script>
     FunnelRequest:
       type: object
       required:
@@ -1211,79 +1063,42 @@ components:
           default: visitor
         strict_order:
           type: boolean
-    SettingsCount:
+    CountryListRequest:
       type: object
-      required:
-      - site_id
-      - count
+      description: ISO 3166-1 alpha-2 codes. Replaces both lists.
       properties:
-        site_id:
-          type: integer
-          format: int64
-        count:
-          type: integer
-          description: Entries stored after the replace.
-    SiteDetail:
+        allowed:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+    GoalRequest:
       type: object
       required:
-      - site_id
-      - name
-      - hash
-      - timezone
-      - week_start
-      - hobby
-      - script_url
-      - snippet
-      properties:
-        site_id:
-          type: integer
-          format: int64
-        name:
-          type: string
-          description: The site url as stored.
-        hash:
-          type: string
-          description: Same token as in SiteSummary.hash.
-        timezone:
-          type: string
-        week_start:
-          type: integer
-        hobby:
-          type: boolean
-        script_url:
-          type: string
-        snippet:
-          type: string
-          description: The ready-to-paste script tag.
-    Goal:
-      type: object
-      required:
-      - id
-      - host_id
       - name
       properties:
-        id:
-          type: integer
-          format: int64
-        host_id:
-          type: integer
-          format: int64
         name:
           type: string
         path:
           type: string
+          description: URL path to match.
         operator:
           type: string
+          enum:
+          - e
+          - b
+          - c
+          default: e
+          description: e = equals, b = begins with, c = contains.
         event_name:
           type: string
+          description: Match a custom event instead of a path.
         scroll_depth:
           type: integer
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+          description: Percent scrolled.
     TrackingFeatureState:
       type: object
       required:
@@ -1313,6 +1128,69 @@ components:
         size_br:
           type: integer
           description: Marginal cost in bytes, brotli-compressed.
+    SiteSnippet:
+      type: object
+      required:
+      - site_id
+      - script_url
+      - snippet
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        script_url:
+          type: string
+        snippet:
+          type: string
+          description: 'The tag to paste, ready as it stands — install it verbatim rather than rebuilding it from `script_url`. A hobby site''s tag carries a `data-id` attribute as well: its script is a `/t/` bundle addressed by hash, and that attribute is the only place the counter inside it can read the site id. A tag for a paid site needs no attributes.
+
+            '
+          examples:
+          - <script defer src="https://cdn.statable.com/js/3195799/s.js"></script>
+          - <script defer src="https://cdn.statable.com/js/07k1eD84d2/t/gw.js" data-id="3195799"></script>
+    Goal:
+      type: object
+      required:
+      - id
+      - host_id
+      - name
+      properties:
+        id:
+          type: integer
+          format: int64
+        host_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        path:
+          type: string
+        operator:
+          type: string
+        event_name:
+          type: string
+        scroll_depth:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CountryEntry:
+      type: object
+      required:
+      - code
+      - created_at
+      properties:
+        code:
+          type: string
+          description: ISO 3166-1 alpha-2.
+          example: DE
+        created_at:
+          type: string
+          format: date-time
+          description: When the country was added to the list.
     HostnameList:
       type: object
       description: The stored lists, as GET returns them. Both keys are always present; an empty list is [].
@@ -1354,18 +1232,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TrackingFeatureState'
-    CountryListRequest:
-      type: object
-      description: ISO 3166-1 alpha-2 codes. Replaces both lists.
-      properties:
-        allowed:
-          type: array
-          items:
-            type: string
-        blocked:
-          type: array
-          items:
-            type: string
     UpdateSiteRequest:
       type: object
       description: Omitted fields are left unchanged.
@@ -1380,17 +1246,148 @@ components:
           minimum: 0
           maximum: 6
           description: 0 = Sunday … 6 = Saturday.
-  responses:
-    WriteDisabled:
-      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+    PublicDashboard:
+      type: object
+      required:
+      - enabled
+      properties:
+        site_id:
+          type: integer
+          format: int64
+          readOnly: true
+        enabled:
+          type: boolean
+    HostnameListRequest:
+      type: object
+      description: Replaces both lists. Send [] to clear one.
+      properties:
+        allowed:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+    CountryList:
+      type: object
+      description: 'The stored lists, as GET returns them. Note the deliberate asymmetry with the PUT body: writes take bare ISO codes, reads return one entry per country with the time it was added. Both keys are always present; an empty list is [].
 
         '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    SiteForbidden:
-      description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+      required:
+      - allowed
+      - blocked
+      properties:
+        allowed:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryEntry'
+        blocked:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryEntry'
+    SettingsCount:
+      type: object
+      required:
+      - site_id
+      - count
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        count:
+          type: integer
+          description: Entries stored after the replace.
+    FunnelDefinition:
+      type: object
+      description: A saved funnel definition (managed in the dashboard).
+      properties:
+        id:
+          type: integer
+          format: int64
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        scope:
+          type: string
+          enum:
+          - visitor
+          - session
+        strict_order:
+          type: boolean
+          description: When true, steps must occur in exact order (windowFunnel strict_order).
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SiteDetail:
+      type: object
+      required:
+      - site_id
+      - name
+      - hash
+      - timezone
+      - week_start
+      - hobby
+      - script_url
+      - snippet
+      properties:
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: The site url as stored.
+        hash:
+          type: string
+          description: Same token as in SiteSummary.hash.
+        timezone:
+          type: string
+        week_start:
+          type: integer
+        hobby:
+          type: boolean
+        script_url:
+          type: string
+        snippet:
+          type: string
+          description: The ready-to-paste script tag.
+  headers:
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+  responses:
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
       content:
         application/json:
           schema:
@@ -1401,8 +1398,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    SiteForbidden:
+      description: '`insufficient_scope`, `key_not_scoped`, or `not_site_owner`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SiteNotFound:
+      description: '`write_disabled` or `unknown_site`.'
       content:
         application/json:
           schema:
@@ -1426,19 +1435,10 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    Internal:
-      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
 
         '
-      headers:
-        X-Request-ID:
-          $ref: '#/components/headers/X-Request-ID'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    SiteNotFound:
-      description: '`write_disabled` or `unknown_site`.'
       content:
         application/json:
           schema:

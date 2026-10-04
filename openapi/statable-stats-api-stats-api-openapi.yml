@@ -410,138 +410,46 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 components:
-  headers:
-    X-RateLimit-Remaining:
-      description: Requests left in the current per-key window.
-      schema:
-        type: integer
-    X-RateLimit-Reset:
-      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
-      schema:
-        type: integer
-    X-Request-ID:
-      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+  schemas:
+    FunnelStep:
+      type: object
+      description: 'One step of a funnel definition. `kind` selects which other fields apply.
 
         '
-      schema:
-        type: string
-        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
-    X-RateLimit-Limit:
-      description: The per-key hourly rate limit for your plan.
-      schema:
-        type: integer
-  schemas:
-    FunnelReportResponse:
-      type: object
-      properties:
-        funnel:
-          type: object
-          properties:
-            id:
-              type: integer
-              format: int64
-            name:
-              type: string
-            scope:
-              type: string
-              enum:
-              - visitor
-              - session
-            strict_order:
-              type: boolean
-        entering:
-          type: integer
-          format: int64
-          description: Visitors that reached step 0 — the funnel's denominator.
-        all_visitors:
-          type: integer
-          format: int64
-          description: Total visitors/visits in the period (funnel-independent).
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/FunnelReportStep'
-        query:
-          type: object
-          description: The resolved request (site_id, funnel_id, normalized date_range, filters).
-    ResultRow:
-      type: object
-      properties:
-        dimensions:
-          type: object
-          description: 'Absent for aggregate queries. Keyed by the requested dimension string. For geo breakdowns the value is the round-trip code (visit:country → ISO alpha-2, visit:region → subdivision code, visit:city → numeric geoname_id) — exactly what the matching filter accepts.
-
-            '
-          additionalProperties:
-            type: string
-        labels:
-          type: object
-          description: 'Present only on geo breakdowns — the human-readable display name for the code in `dimensions`, keyed by the same dimension.
-
-            '
-          additionalProperties:
-            type: string
-        metrics:
-          type: object
-          description: The requested metrics for this row.
-          additionalProperties:
-            type: number
-        compare:
-          type: object
-          description: 'Present only when the request set `compare`. Keyed by metric → {value, change}: the metric''s value in the compare window and the percent change vs it. Not emitted on event:status_code / event:goal.
-
-            '
-          additionalProperties:
-            type: object
-            properties:
-              value:
-                type: number
-              change:
-                type: number
-    SitesResponse:
-      type: object
       required:
-      - sites
+      - kind
       properties:
-        sites:
-          type: array
-          items:
-            $ref: '#/components/schemas/SiteSummary'
-    QueryEcho:
-      type: object
-      description: Echo of the resolved request.
-      properties:
-        site_id:
+        kind:
+          type: string
+          enum:
+          - page
+          - event
+          - goal
+          - scroll
+          - entry_page
+          - exit_page
+        path:
+          type: string
+          description: URL path — for kind page/entry_page/exit_page.
+        operator:
+          type: string
+          description: Path match operator (e|b|c|r) — for kind page.
+        event:
+          type: string
+          description: Custom event name — for kind event.
+        prop_key:
+          type: string
+          description: Optional custom-property key — for kind event.
+        prop_value:
+          type: string
+          description: Optional custom-property value — for kind event.
+        goal_id:
           type: integer
           format: int64
-        metrics:
-          type: array
-          items:
-            $ref: '#/components/schemas/Metric'
-        date_range:
-          type: array
-          description: Always the resolved concrete [from, to] YYYY-MM-DD window (presets normalized).
-          minItems: 2
-          maxItems: 2
-          items:
-            type: string
-            format: date
-        compare_date_range:
-          type: array
-          description: Present only when `compare` was set — the resolved [from, to] of the compare window.
-          minItems: 2
-          maxItems: 2
-          items:
-            type: string
-            format: date
-        dimensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Dimension'
-        filters:
-          type: array
-          items:
-            $ref: '#/components/schemas/Filter'
+          description: Goal id — for kind goal.
+        threshold:
+          type: integer
+          description: Scroll depth 0..100 — for kind scroll.
     Error:
       type: object
       required:
@@ -619,108 +527,89 @@ components:
           - hobby_always_public
           - not_found
           - method_not_allowed
-    FunnelStep:
+    Filter:
       type: object
-      description: 'One step of a funnel definition. `kind` selects which other fields apply.
-
-        '
+      additionalProperties: false
       required:
-      - kind
+      - field
+      - operator
+      - values
       properties:
-        kind:
+        field:
           type: string
+          description: 'Field name WITHOUT the visit:/event: prefix. Geo fields take codes, not names (country/region = ISO/subdivision codes, city = numeric geoname_id — the values geo breakdowns return). The `event` field filters by a custom event name (an `event:name` breakdown value) and restricts the whole query to that event''s sessions; it accepts ONLY operator `is` with a single non-standard value (not `pageview` / `engagement`) — other forms return `invalid_filter`.
+
+            '
           enum:
-          - page
-          - event
-          - goal
-          - scroll
+          - browser
+          - browser_version
+          - os
+          - os_version
+          - device
+          - country
+          - city
+          - region
+          - hostname
+          - utm_source
+          - utm_medium
+          - utm_campaign
+          - utm_content
+          - utm_term
           - entry_page
           - exit_page
-        path:
-          type: string
-          description: URL path — for kind page/entry_page/exit_page.
+          - source
+          - channel
+          - referrer
+          - page
+          - code
+          - event
         operator:
           type: string
-          description: Path match operator (e|b|c|r) — for kind page.
-        event:
-          type: string
-          description: Custom event name — for kind event.
-        prop_key:
-          type: string
-          description: Optional custom-property key — for kind event.
-        prop_value:
-          type: string
-          description: Optional custom-property value — for kind event.
-        goal_id:
-          type: integer
-          format: int64
-          description: Goal id — for kind goal.
-        threshold:
-          type: integer
-          description: Scroll depth 0..100 — for kind scroll.
-    Metric:
-      type: string
-      description: '`visits` = sessions. `visit_duration` in seconds. `bounce_rate` is a 0–100 percentage. `views_per_visit` = pageviews/visits (2 decimals). `engagement_time` = avg active-engagement seconds (aggregate + time-series, distinct from visit_duration). `events` = raw event count (breakdowns event:name/props/goal). `conversion_rate` = converters percent (event:goal). `time_on_page`/`scroll_depth` = avg seconds / avg max scroll% 0-100 (event:page, event:folder). `exit_rate` = exits percent of pageviews (visit:exit_page). The last five are breakdown-only: off their dimension, and on an aggregate or a time series, they return `metric_not_available` naming the shape and the dimensions that do compute them. `unknown_metric` means the name itself is not a metric we compute.
-
-        '
-      enum:
-      - visitors
-      - pageviews
-      - visits
-      - visit_duration
-      - bounce_rate
-      - views_per_visit
-      - engagement_time
-      - events
-      - conversion_rate
-      - time_on_page
-      - scroll_depth
-      - exit_rate
-    Meta:
-      type: object
-      description: Present only on breakdown responses.
-      properties:
-        total:
-          type: integer
-          description: Total distinct values for the window, across all pages.
-        limit:
-          type: integer
-          description: Effective limit after clamping.
-        offset:
-          type: integer
-        has_more:
-          type: boolean
-          description: True when offset + returned rows < total. Page again with offset += limit.
-    FunnelDefinition:
-      type: object
-      description: A saved funnel definition (managed in the dashboard).
-      properties:
-        id:
-          type: integer
-          format: int64
-        site_id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        scope:
-          type: string
           enum:
-          - visitor
-          - session
-        strict_order:
-          type: boolean
-          description: When true, steps must occur in exact order (windowFunnel strict_order).
-        steps:
+          - is
+          - is_not
+          - contains
+          - does_not_contain
+        values:
           type: array
+          minItems: 1
+          description: OR-ed together. A value may not contain a comma.
           items:
-            $ref: '#/components/schemas/FunnelStep'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+            type: string
+    ResultRow:
+      type: object
+      properties:
+        dimensions:
+          type: object
+          description: 'Absent for aggregate queries. Keyed by the requested dimension string. For geo breakdowns the value is the round-trip code (visit:country → ISO alpha-2, visit:region → subdivision code, visit:city → numeric geoname_id) — exactly what the matching filter accepts.
+
+            '
+          additionalProperties:
+            type: string
+        labels:
+          type: object
+          description: 'Present only on geo breakdowns — the human-readable display name for the code in `dimensions`, keyed by the same dimension.
+
+            '
+          additionalProperties:
+            type: string
+        metrics:
+          type: object
+          description: The requested metrics for this row.
+          additionalProperties:
+            type: number
+        compare:
+          type: object
+          description: 'Present only when the request set `compare`. Keyed by metric → {value, change}: the metric''s value in the compare window and the percent change vs it. Not emitted on event:status_code / event:goal.
+
+            '
+          additionalProperties:
+            type: object
+            properties:
+              value:
+                type: number
+              change:
+                type: number
     DateRange:
       description: 'A scalar string — a preset (`7d`/`30d` = last N full days; `month` = current calendar month to date; `realtime` = last ~30 min) or a bare `Nd` for the last N days, N in 1–90 (e.g. `14d`) — OR a custom inclusive `[from, to]` pair of `YYYY-MM-DD` dates with `from <= to` and a span of at most 366 days. The scalar forms are exactly what `GET /sites` accepts; for a window over 90 days use a custom pair.
 
@@ -739,24 +628,95 @@ components:
       - 14d
       - - '2026-06-01'
         - '2026-06-30'
-    FunnelReportRequest:
+    FunnelReportResponse:
       type: object
-      required:
-      - date_range
       properties:
-        site_id:
+        funnel:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            name:
+              type: string
+            scope:
+              type: string
+              enum:
+              - visitor
+              - session
+            strict_order:
+              type: boolean
+        entering:
           type: integer
           format: int64
-          description: Optional for a single-site key; required for an all-sites key.
-        date_range:
-          $ref: '#/components/schemas/DateRange'
-        filters:
+          description: Visitors that reached step 0 — the funnel's denominator.
+        all_visitors:
+          type: integer
+          format: int64
+          description: Total visitors/visits in the period (funnel-independent).
+        steps:
           type: array
-          description: 'Segment/session filters only (country, browser, os, device, source, channel, referrer, utm_*, entry_page, exit_page, hostname). Event-level fields (event, page, code) return `invalid_filter`.
-
-            '
           items:
-            $ref: '#/components/schemas/Filter'
+            $ref: '#/components/schemas/FunnelReportStep'
+        query:
+          type: object
+          description: The resolved request (site_id, funnel_id, normalized date_range, filters).
+    FunnelReportStep:
+      type: object
+      description: One step's outcome. Steps are ordered — do not sort them.
+      properties:
+        index:
+          type: integer
+          description: 0-based position in the funnel.
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - page
+          - event
+          - goal
+          - scroll
+          - entry_page
+          - exit_page
+        visitors:
+          type: integer
+          format: int64
+          description: Visitors/visits that reached this step.
+        conversion_rate:
+          type: number
+          description: visitors / entering * 100 — cumulative vs the first step, NOT step-to-step.
+        dropoff:
+          type: integer
+          format: int64
+          description: Visitors lost versus the previous step.
+    SitesResponse:
+      type: object
+      required:
+      - sites
+      properties:
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiteSummary'
+    Metric:
+      type: string
+      description: '`visits` = sessions. `visit_duration` in seconds. `bounce_rate` is a 0–100 percentage. `views_per_visit` = pageviews/visits (2 decimals). `engagement_time` = avg active-engagement seconds (aggregate + time-series, distinct from visit_duration). `events` = raw event count (breakdowns event:name/props/goal). `conversion_rate` = converters percent (event:goal). `time_on_page`/`scroll_depth` = avg seconds / avg max scroll% 0-100 (event:page, event:folder). `exit_rate` = exits percent of pageviews (visit:exit_page). The last five are breakdown-only: off their dimension, and on an aggregate or a time series, they return `metric_not_available` naming the shape and the dimensions that do compute them. `unknown_metric` means the name itself is not a metric we compute.
+
+        '
+      enum:
+      - visitors
+      - pageviews
+      - visits
+      - visit_duration
+      - bounce_rate
+      - views_per_visit
+      - engagement_time
+      - events
+      - conversion_rate
+      - time_on_page
+      - scroll_depth
+      - exit_rate
     SiteSummary:
       type: object
       required:
@@ -799,42 +759,6 @@ components:
           format: date-time
         stats:
           $ref: '#/components/schemas/SiteStats'
-    Dimension:
-      type: string
-      description: 'At most one per query. A time dimension yields a series; a breakdown dimension yields top-N rows. Not every metric is valid for every breakdown — a metric the builder does not compute returns `metric_not_available`. In addition to the enum below, a dynamic `event:props:<key>` dimension breaks a custom event down by one of its property values (metrics `visitors` + `events`); it requires an `event` filter to name the event, else `event_filter_required`.
-
-        '
-      enum:
-      - time
-      - time:minute
-      - time:hour
-      - time:day
-      - time:week
-      - time:month
-      - visit:source
-      - visit:referrer
-      - visit:channel
-      - visit:utm_source
-      - visit:utm_medium
-      - visit:utm_campaign
-      - visit:utm_content
-      - visit:utm_term
-      - visit:country
-      - visit:region
-      - visit:city
-      - visit:browser
-      - visit:browser_version
-      - visit:os
-      - visit:os_version
-      - visit:device
-      - visit:entry_page
-      - visit:exit_page
-      - event:page
-      - event:folder
-      - event:hostname
-      - event:name
-      - event:goal
-      - event:status_code
     QueryRequest:
       type: object
       additionalProperties: false
@@ -890,55 +814,149 @@ components:
             items:
               type: string
               format: date
-    Filter:
+    QueryEcho:
       type: object
-      additionalProperties: false
-      required:
-      - field
-      - operator
-      - values
+      description: Echo of the resolved request.
       properties:
-        field:
-          type: string
-          description: 'Field name WITHOUT the visit:/event: prefix. Geo fields take codes, not names (country/region = ISO/subdivision codes, city = numeric geoname_id — the values geo breakdowns return). The `event` field filters by a custom event name (an `event:name` breakdown value) and restricts the whole query to that event''s sessions; it accepts ONLY operator `is` with a single non-standard value (not `pageview` / `engagement`) — other forms return `invalid_filter`.
-
-            '
-          enum:
-          - browser
-          - browser_version
-          - os
-          - os_version
-          - device
-          - country
-          - city
-          - region
-          - hostname
-          - utm_source
-          - utm_medium
-          - utm_campaign
-          - utm_content
-          - utm_term
-          - entry_page
-          - exit_page
-          - source
-          - channel
-          - referrer
-          - page
-          - code
-          - event
-        operator:
-          type: string
-          enum:
-          - is
-          - is_not
-          - contains
-          - does_not_contain
-        values:
+        site_id:
+          type: integer
+          format: int64
+        metrics:
           type: array
-          minItems: 1
-          description: OR-ed together. A value may not contain a comma.
+          items:
+            $ref: '#/components/schemas/Metric'
+        date_range:
+          type: array
+          description: Always the resolved concrete [from, to] YYYY-MM-DD window (presets normalized).
+          minItems: 2
+          maxItems: 2
           items:
             type: string
+            format: date
+        compare_date_range:
+          type: array
+          description: Present only when `compare` was set — the resolved [from, to] of the compare window.
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+            format: date
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dimension'
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Filter'
+    SiteStats:
+      type: object
+      properties:
+        date_range:
+          type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+    FunnelReportRequest:
+      type: object
+      required:
+      - date_range
+      properties:
+        site_id:
+          type: integer
+          format: int64
+          description: Optional for a single-site key; required for an all-sites key.
+        date_range:
+          $ref: '#/components/schemas/DateRange'
+        filters:
+          type: array
+          description: 'Segment/session filters only (country, browser, os, device, source, channel, referrer, utm_*, entry_page, exit_page, hostname). Event-level fields (event, page, code) return `invalid_filter`.
+
+            '
+          items:
+            $ref: '#/components/schemas/Filter'
+    FunnelDefinition:
+      type: object
+      description: A saved funnel definition (managed in the dashboard).
+      properties:
+        id:
+          type: integer
+          format: int64
+        site_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        scope:
+          type: string
+          enum:
+          - visitor
+          - session
+        strict_order:
+          type: boolean
+          description: When true, steps must occur in exact order (windowFunnel strict_order).
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Dimension:
+      type: string
+      description: 'At most one per query. A time dimension yields a series; a breakdown dimension yields top-N rows. Not every metric is valid for every breakdown — a metric the builder does not compute returns `metric_not_available`. In addition to the enum below, a dynamic `event:props:<key>` dimension breaks a custom event down by one of its property values (metrics `visitors` + `events`); it requires an `event` filter to name the event, else `event_filter_required`.
+
+        '
+      enum:
+      - time
+      - time:minute
+      - time:hour
+      - time:day
+      - time:week
+      - time:month
+      - visit:source
+      - visit:referrer
+      - visit:channel
+      - visit:utm_source
+      - visit:utm_medium
+      - visit:utm_campaign
+      - visit:utm_content
+      - visit:utm_term
+      - visit:country
+      - visit:region
+      - visit:city
+      - visit:browser
+      - visit:browser_version
+      - visit:os
+      - visit:os_version
+      - visit:device
+      - visit:entry_page
+      - visit:exit_page
+      - event:page
+      - event:folder
+      - event:hostname
+      - event:name
+      - event:goal
+      - event:status_code
+    Meta:
+      type: object
+      description: Present only on breakdown responses.
+      properties:
+        total:
+          type: integer
+          description: Total distinct values for the window, across all pages.
+        limit:
+          type: integer
+          description: Effective limit after clamping.
+        offset:
+          type: integer
+        has_more:
+          type: boolean
+          description: True when offset + returned rows < total. Page again with offset += limit.
     QueryResponse:
       type: object
       required:
@@ -956,49 +974,34 @@ components:
         has_import:
           type: boolean
           description: True when the site has imported (e.g. GA4) data overlapping the queried window.
-    SiteStats:
-      type: object
-      properties:
-        date_range:
-          type: string
-        metrics:
-          type: object
-          additionalProperties:
-            type: number
-    FunnelReportStep:
-      type: object
-      description: One step's outcome. Steps are ordered — do not sort them.
-      properties:
-        index:
-          type: integer
-          description: 0-based position in the funnel.
-        name:
-          type: string
-        kind:
-          type: string
-          enum:
-          - page
-          - event
-          - goal
-          - scroll
-          - entry_page
-          - exit_page
-        visitors:
-          type: integer
-          format: int64
-          description: Visitors/visits that reached this step.
-        conversion_rate:
-          type: number
-          description: visitors / entering * 100 — cumulative vs the first step, NOT step-to-step.
-        dropoff:
-          type: integer
-          format: int64
-          description: Visitors lost versus the previous step.
-  responses:
-    BadRequest:
-      description: 'Invalid request. Branch on the stable `code`: invalid_request, metrics_required, unknown_metric, too_many_dimensions, unknown_dimension, invalid_date_range, invalid_interval, metric_not_available, invalid_filter, event_filter_required, invalid_compare, compare_length_mismatch, site_id_required, limit_offset_misuse.
+  headers:
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
 
         '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
+  responses:
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
       content:
         application/json:
           schema:
@@ -1011,6 +1014,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     Forbidden:
       description: '`insufficient_scope` (the key lacks the `read` scope every endpoint here requires), `key_not_scoped` (single-site key asked for a different site) or `tracking_inactive` (the site''s tracking has stopped).
 
@@ -1019,8 +1028,10 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing/malformed/invalid/expired/revoked bearer token (`unauthorized`).
+    BadRequest:
+      description: 'Invalid request. Branch on the stable `code`: invalid_request, metrics_required, unknown_metric, too_many_dimensions, unknown_dimension, invalid_date_range, invalid_interval, metric_not_available, invalid_filter, event_filter_required, invalid_compare, compare_length_mismatch, site_id_required, limit_offset_misuse.
+
+        '
       content:
         application/json:
           schema:
@@ -1040,17 +1051,6 @@ components:
           $ref: '#/components/headers/X-RateLimit-Remaining'
         X-RateLimit-Reset:
           $ref: '#/components/headers/X-RateLimit-Reset'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Internal:
-      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
-
-        '
-      headers:
-        X-Request-ID:
-          $ref: '#/components/headers/X-Request-ID'
       content:
         application/json:
           schema:

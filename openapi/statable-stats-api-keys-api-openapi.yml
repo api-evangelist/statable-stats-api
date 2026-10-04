@@ -174,42 +174,75 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 components:
-  headers:
-    X-RateLimit-Remaining:
-      description: Requests left in the current per-key window.
-      schema:
-        type: integer
-    X-RateLimit-Reset:
-      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
-      schema:
-        type: integer
-    X-Request-ID:
-      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
-
-        '
-      schema:
-        type: string
-        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
-    X-RateLimit-Limit:
-      description: The per-key hourly rate limit for your plan.
-      schema:
-        type: integer
   schemas:
-    CreatedAPIKey:
-      description: 'The created (or rotated) key plus its raw token. The token is returned exactly once and cannot be retrieved later.
+    APIKey:
+      type: object
+      description: 'The non-secret view of a key. The raw token is never stored and never appears here — only in the create/rotate responses.
 
         '
-      allOf:
-      - $ref: '#/components/schemas/APIKey'
-      - type: object
-        required:
-        - token
-        properties:
-          token:
-            type: string
-            description: The raw bearer token. Store it now.
-            examples:
-            - stbl_Z9y8X7w6…
+      required:
+      - id
+      - name
+      - prefix
+      - website_id
+      - scopes
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        prefix:
+          type: string
+          description: Non-secret fragment of the token, to identify the key in a list.
+          examples:
+          - stbl_A1b2C3d4
+        website_id:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The site the key is locked to; null = all of the owner's sites.
+        scopes:
+          type: string
+          description: Comma-separated scope set, in catalog order.
+          examples:
+          - read
+          - read,keys:manage
+        created_at:
+          type: string
+          format: date-time
+        created_ip:
+          type:
+          - string
+          - 'null'
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_ip:
+          type:
+          - string
+          - 'null'
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'null = never expires. Only dashboard-created keys can be non-expiring; keys created over the API always carry an expiry.
+
+            '
+    APIKeyEventList:
+      type: object
+      required:
+      - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKeyEvent'
     Error:
       type: object
       required:
@@ -287,65 +320,35 @@ components:
           - hobby_always_public
           - not_found
           - method_not_allowed
-    APIKey:
+    APIKeyEvent:
       type: object
-      description: 'The non-secret view of a key. The raw token is never stored and never appears here — only in the create/rotate responses.
-
-        '
       required:
-      - id
-      - name
-      - prefix
-      - website_id
-      - scopes
+      - event
       - created_at
       properties:
-        id:
-          type: integer
-          format: int64
-        name:
+        event:
           type: string
-        prefix:
+          enum:
+          - created
+          - rotated
+          - revoked
+        ip:
+          type:
+          - string
+          - 'null'
+        user_agent:
+          type:
+          - string
+          - 'null'
+        created_at:
           type: string
-          description: Non-secret fragment of the token, to identify the key in a list.
-          examples:
-          - stbl_A1b2C3d4
-        website_id:
+          format: date-time
+        actor_key_id:
           type:
           - integer
           - 'null'
           format: int64
-          description: The site the key is locked to; null = all of the owner's sites.
-        scopes:
-          type: string
-          description: Comma-separated scope set, in catalog order.
-          examples:
-          - read
-          - read,keys:manage
-        created_at:
-          type: string
-          format: date-time
-        created_ip:
-          type:
-          - string
-          - 'null'
-        last_used_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        last_used_ip:
-          type:
-          - string
-          - 'null'
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: 'null = never expires. Only dashboard-created keys can be non-expiring; keys created over the API always carry an expiry.
-
-            '
+          description: The API key that performed the action; null = the dashboard.
     CreateAPIKeyRequest:
       type: object
       required:
@@ -381,35 +384,21 @@ components:
           maximum: 365
           default: 90
           description: Outside 1–365 → 400 invalid_expiry.
-    APIKeyEvent:
-      type: object
-      required:
-      - event
-      - created_at
-      properties:
-        event:
-          type: string
-          enum:
-          - created
-          - rotated
-          - revoked
-        ip:
-          type:
-          - string
-          - 'null'
-        user_agent:
-          type:
-          - string
-          - 'null'
-        created_at:
-          type: string
-          format: date-time
-        actor_key_id:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: The API key that performed the action; null = the dashboard.
+    CreatedAPIKey:
+      description: 'The created (or rotated) key plus its raw token. The token is returned exactly once and cannot be retrieved later.
+
+        '
+      allOf:
+      - $ref: '#/components/schemas/APIKey'
+      - type: object
+        required:
+        - token
+        properties:
+          token:
+            type: string
+            description: The raw bearer token. Store it now.
+            examples:
+            - stbl_Z9y8X7w6…
     APIKeyList:
       type: object
       required:
@@ -419,15 +408,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/APIKey'
-    APIKeyEventList:
-      type: object
-      required:
-      - events
-      properties:
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/APIKeyEvent'
+  headers:
+    X-RateLimit-Remaining:
+      description: Requests left in the current per-key window.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Seconds until the per-key window resets (delta-seconds, not an epoch).
+      schema:
+        type: integer
+    X-RateLimit-Limit:
+      description: The per-key hourly rate limit for your plan.
+      schema:
+        type: integer
+    X-Request-ID:
+      description: 'Correlation id for support, present on every response including successful ones. The leading segment names the node that served the request, so this one value is enough to locate the log entry. Error bodies repeat it as `request_id`. A client-supplied X-Request-ID is recorded server-side but never echoed back in place of ours.
+
+        '
+      schema:
+        type: string
+        example: ch-node01-01997f2a8b3c7d5e8f01abcdef123456
   responses:
     KeyNotFound:
       description: '`api_key_not_found` — unknown, already revoked, or another account''s key id (deliberately indistinguishable). Or `write_disabled` when the write surface is off.
@@ -437,8 +437,19 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    WriteDisabled:
-      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
+    Internal:
+      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
+
+        '
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SelfModification:
+      description: '`self_modification` — a key may not rotate or revoke itself, so an agent cannot destroy the credential it is mid-flow with.
 
         '
       content:
@@ -478,27 +489,16 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    SelfModification:
-      description: '`self_modification` — a key may not rotate or revoke itself, so an agent cannot destroy the credential it is mid-flow with.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Internal:
-      description: 'Unexpected server error (`internal`). Report it with the `request_id` from the body or the X-Request-ID header: it is what lets the exact log entry be found, and without it a 500 can only be matched by guessing at a time window.
-
-        '
-      headers:
-        X-Request-ID:
-          $ref: '#/components/headers/X-Request-ID'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
     KeysForbidden:
       description: '`insufficient_scope` (the key lacks `keys:manage`), `scope_escalation` (requested scopes exceed the authenticating key''s scopes) or `key_not_scoped` (a single-site key tried to widen its site scope).
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WriteDisabled:
+      description: '`write_disabled` — the write surface is off (`API_WRITE_ENABLED=false`). 404 rather than 403 so a disabled surface is not advertised.
 
         '
       content:
