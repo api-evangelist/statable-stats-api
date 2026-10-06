@@ -4,7 +4,7 @@ description: Privacy-first, cookieless web analytics from Statable (Key Arg B.V.
   MCP server, an llms.txt, and a CLI for querying visitors, pages, sources, goals, funnels, custom events and live visitors.
 url: https://raw.githubusercontent.com/api-evangelist/statable-stats-api/refs/heads/main/apis.yml
 created: '2026-09-18'
-modified: '2026-09-18'
+modified: '2026-10-06'
 specificationVersion: '0.21'
 tags:
 - Analytics
@@ -119,6 +119,10 @@ maintainers:
   url: https://statable.com
   email: support@statable.com
 common:
+- url: https://statable.com/blog/
+  type: Blog
+- url: https://statable.com/blog/feed.xml
+  type: BlogRSS
 - type: MCPServer
   url: https://mcp.statable.com/mcp
 - type: Website
