@@ -19,3 +19,70 @@ plans:
   - {name: 10M,  quota_pageviews_month: 10000000, price_monthly_usd: 169, price_yearly_usd_per_month: 135}
   - {name: 10M+, quota_pageviews_month: null,     price: contact sales, note: custom pricing}
   - {name: Free Access, price_monthly_usd: 0, note: "permanent free for sites on .edu / .github.io / .gitlab.io (per site, widget required)"}
+x-canonical:
+  generated: '2026-10-08'
+  vocabulary: all/0-working/economics/plans-canonical.yml
+  models:
+  - negotiated
+  units: []
+  plans:
+  - name: 10K
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 100K
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 200K
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 500K
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 1M
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 2M
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 5M
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 10M
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
+  - name: 10M+
+    access: other
+    model: negotiated
+    model_how: derived
+    units: []
+    periods: []
+  - name: Free Access
+    access: other
+    model: unstated
+    model_how: derived
+    units: []
+    periods: []
