@@ -49,3 +49,33 @@
     builder: provider (package published from the provider's own domain)
   status: not-a-workflow
   arazzo: null
+- slug: statable-stats-api-go-module-proxy
+  label: Go module proxy
+  partner_name: Go module proxy
+  category: official SDK (Go)
+  type: register
+  channel: package-registry
+  evidence: https://pkg.go.dev/github.com/key-arg/statable-cli
+  source: edge
+  relationship: distribution-channel
+  contract_reference:
+    register: Go module proxy (public registry JSON)
+    spec_file: null
+    language: Go
+    packages:
+    - name: github.com/key-arg/statable-cli
+      version: v0.4.4
+      released: '2026-09-16'
+      released_field: Time
+      lapsed: false
+      page: https://pkg.go.dev/github.com/key-arg/statable-cli
+      repo_leg: github-org:key-arg
+      publisher_leg: org:key-arg
+      matched_by: github-org
+    current: true
+    signal_note: 'an official package on the registry: distribution, not an integration; lapsed = no release in
+      24 months'
+    detected_by: sweep-official-sdks.py
+    detected: '2026-10-18'
+  status: not-a-workflow
+  arazzo: null
